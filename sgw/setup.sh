@@ -61,6 +61,11 @@ if [[ -n "$SSL_DOMAIN" ]]; then
 
     if [[ -z "$ACME_CMD" ]]; then
         echo -e "${YELLOW}未检测到 acme.sh，正在安装…${RESET}"
+        # acme.sh 需要 cron 来设置自动续期任务，Debian/Ubuntu 默认未安装
+        if ! command -v crontab &>/dev/null; then
+            echo -e "${YELLOW}正在安装 cron（acme.sh 自动续期所需）…${RESET}"
+            apt-get install -y -q cron 2>/dev/null || true
+        fi
         curl -fsSL https://get.acme.sh | sh -s "email=admin@${SSL_DOMAIN}"
         # shellcheck source=/dev/null
         source "$HOME/.bashrc" 2>/dev/null || true
