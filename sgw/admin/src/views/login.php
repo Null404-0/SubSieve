@@ -26,7 +26,7 @@ input:focus{border-color:#6366f1}
     <div class="err"><?= htmlspecialchars($_SESSION['login_error']) ?></div>
     <?php unset($_SESSION['login_error']); ?>
   <?php endif; ?>
-  <form method="POST" action="/">
+  <form method="POST" action="<?= ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/' ?>">
     <label>用户名</label>
     <input type="text" name="username" autocomplete="username" required autofocus>
     <label>密码</label>

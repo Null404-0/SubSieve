@@ -37,7 +37,8 @@ if (str_starts_with($uri, '/api/')) {
 // 退出
 if ($uri === '/logout') {
     session_destroy();
-    header('Location: /');
+    $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
+    header('Location: ' . $base);
     exit;
 }
 
@@ -46,13 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($uri === '/' || $uri === '/index.p
     $user = trim($_POST['username'] ?? '');
     $pass = $_POST['password'] ?? '';
 
+    $base = ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/' : '/';
     if ($user === ADMIN_USER && ADMIN_PASS !== '' && hash_equals(ADMIN_PASS, $pass)) {
         $_SESSION['auth'] = true;
         $_SESSION['ts']   = time();
-        header('Location: /');
+        header('Location: ' . $base);
     } else {
         $_SESSION['login_error'] = '用户名或密码错误';
-        header('Location: /');
+        header('Location: ' . $base);
     }
     exit;
 }
