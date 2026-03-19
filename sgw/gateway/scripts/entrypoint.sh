@@ -25,6 +25,8 @@ SKIP_NGINX_RELOAD=1 /scripts/reload_whitelist.sh
 # 初始化空黑名单
 [[ ! -f /etc/nginx/subscribe/blacklist.conf ]] && echo "# blacklist" > /etc/nginx/subscribe/blacklist.conf
 [[ ! -f /etc/nginx/subscribe/blacklist.json ]] && echo "[]" > /etc/nginx/subscribe/blacklist.json
+# 确保 admin 容器可写（admin php-fpm 以非 root 用户运行）
+chmod 666 /etc/nginx/subscribe/blacklist.conf /etc/nginx/subscribe/blacklist.json
 
 # 初始化自定义UA封禁
 if [[ ! -f /etc/nginx/subscribe/ua_custom.conf ]]; then
@@ -36,6 +38,7 @@ map $http_user_agent $is_custom_bad_ua {
 UAEOF
 fi
 [[ ! -f /etc/nginx/subscribe/ua_blacklist.json ]] && echo "[]" > /etc/nginx/subscribe/ua_blacklist.json
+chmod 666 /etc/nginx/subscribe/ua_custom.conf /etc/nginx/subscribe/ua_blacklist.json
 
 # 首次拉取云IP库
 if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf ]]; then
