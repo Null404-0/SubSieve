@@ -8,7 +8,7 @@ define('ADMIN_PASS',        getenv('ADMIN_PASS')        ?: '');
 define('GATEWAY_CONTAINER', getenv('GATEWAY_CONTAINER') ?: 'subscribe-gateway');
 define('SESSION_LIFETIME',  (int)(getenv('SESSION_LIFETIME') ?: 28800)); // 8小时
 // 后台访问路径前缀，留空则不校验（例如 ef9d1566 → 必须访问 /ef9d1566 才能进入后台）
-define('ADMIN_SECRET_PATH', trim(getenv('ADMIN_SECRET_PATH') ?: '', '/'));
+define('ADMIN_SECRET_PATH', trim(trim(getenv('ADMIN_SECRET_PATH') ?: ''), '/'));
 
 // 文件路径（共享 volume）
 define('LOG_FILE',         '/var/log/subscribe/access.log');

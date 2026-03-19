@@ -59,10 +59,50 @@ docker compose up -d --build
 echo -e "${CYAN}清理旧镜像…${RESET}"
 docker image prune -f --filter "dangling=true" > /dev/null 2>&1 || true
 
+# 验证容器健康状态
 echo ""
-echo -e "${BOLD}════════════════════════════════════════════${RESET}"
-echo -e "${GREEN}${BOLD}  ✅ 更新完成${RESET}"
-echo -e "${BOLD}════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}验证容器状态…${RESET}"
+sleep 5
+HEALTH_OK=true
+for NAME in subscribe-gateway subscribe-admin; do
+    STATUS=$(docker inspect --format '{{.State.Status}}' "$NAME" 2>/dev/null || echo "missing")
+    if [[ "$STATUS" == "running" ]]; then
+        echo -e "  ✅ $NAME 运行中"
+    else
+        echo -e "  ❌ $NAME 状态异常（$STATUS）"
+        echo -e "${YELLOW}  最近日志：${RESET}"
+        docker logs --tail 30 "$NAME" 2>&1 | sed 's/^/    /' || true
+        HEALTH_OK=false
+    fi
+done
+
+# 检查管理后台端口是否可达
+ADMIN_PORT=64444
+if (echo > /dev/tcp/localhost/$ADMIN_PORT) 2>/dev/null; then
+    echo -e "  ✅ 管理后台端口 ${ADMIN_PORT} 可达"
+else
+    echo -e "  ❌ 管理后台端口 ${ADMIN_PORT} 不可达"
+    echo -e "${YELLOW}  nginx 可能未正常启动，请查看日志：${RESET}"
+    docker logs --tail 20 subscribe-admin 2>&1 | sed 's/^/    /' || true
+    HEALTH_OK=false
+fi
+
 echo ""
-echo -e "  访问信息不变，查阅方式：${CYAN}cat DEPLOY_INFO.txt${RESET}"
+if [[ "$HEALTH_OK" == "true" ]]; then
+    echo -e "${BOLD}════════════════════════════════════════════${RESET}"
+    echo -e "${GREEN}${BOLD}  ✅ 更新完成${RESET}"
+    echo -e "${BOLD}════════════════════════════════════════════${RESET}"
+    echo ""
+    echo -e "  访问信息不变，查阅方式：${CYAN}cat DEPLOY_INFO.txt${RESET}"
+else
+    echo -e "${BOLD}════════════════════════════════════════════${RESET}"
+    echo -e "${YELLOW}${BOLD}  ⚠️  更新完成，但部分容器异常${RESET}"
+    echo -e "${BOLD}════════════════════════════════════════════${RESET}"
+    echo ""
+    echo -e "  排查命令："
+    echo -e "    ${CYAN}docker ps -a${RESET}               查看所有容器状态"
+    echo -e "    ${CYAN}docker logs subscribe-admin${RESET}  查看管理后台日志"
+    echo -e "    ${CYAN}docker logs subscribe-gateway${RESET} 查看网关日志"
+    echo -e "    ${CYAN}docker compose up -d${RESET}         尝试重新启动"
+fi
 echo ""
