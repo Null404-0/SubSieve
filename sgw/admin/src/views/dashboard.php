@@ -655,7 +655,7 @@ async function quickBlacklist(ip) {
     method:'POST', body:JSON.stringify({ip, comment: cmt}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) toast(`✅ ${ip} 已封禁`);
+  if (d.ok) { toast(`✅ ${ip} 已封禁`); TABS[currentTab].loader(); }
   else toast(d.error||'封禁失败','err');
 }
 
