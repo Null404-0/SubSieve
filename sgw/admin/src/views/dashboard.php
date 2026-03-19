@@ -311,10 +311,14 @@ function manualRefresh() {
 async function apiFetch(url, opts={}) {
   try {
     const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
+    const ct = r.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) {
+      return {ok: false, error: '服务器内部错误，请检查日志'};
+    }
     const json = await r.json();
     return json;
   } catch(e) {
-    return {ok: false, error: e.message || '网络请求失败'};
+    return {ok: false, error: '网络请求失败'};
   }
 }
 
