@@ -27,11 +27,22 @@ fi
 
 # 拉取最新代码（从仓库根目录执行）
 GIT_ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")")
+
+# 自动检测远程默认分支（main / master 均可）
+REMOTE_BRANCH=$(git -C "$GIT_ROOT" remote show origin 2>/dev/null \
+    | grep 'HEAD branch' | awk '{print $NF}')
+REMOTE_BRANCH=${REMOTE_BRANCH:-main}
+
 echo -e "${CYAN}正在拉取最新代码…${RESET}"
-git -C "$GIT_ROOT" pull origin main 2>/dev/null || git -C "$GIT_ROOT" pull origin master 2>/dev/null || {
+if ! git -C "$GIT_ROOT" pull origin "$REMOTE_BRANCH"; then
+    # 还原 .env 再退出
+    if [[ -f .env.bak ]]; then
+        mv .env.bak .env
+        echo -e "${CYAN}已还原 .env${RESET}"
+    fi
     echo -e "${YELLOW}⚠  git pull 失败，请检查网络或手动更新${RESET}"
     exit 1
-}
+fi
 
 # 还原 .env（git pull 不会覆盖未追踪文件，但以防万一）
 if [[ -f .env.bak ]]; then
