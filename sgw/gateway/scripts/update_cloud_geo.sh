@@ -64,10 +64,10 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
     if curl -sfL --max-time 20 \
         "https://stat.ripe.net/data/announced-prefixes/data.json?resource=${ASN}" \
         -o "$TMPFILE"; then
-        COUNT=$(grep -oP '"prefix":\s*"\K[0-9][^"]+' "$TMPFILE" | wc -l)
+        COUNT=$(grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | wc -l)
         TOTAL=$((TOTAL + COUNT))
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
-        grep -oP '"prefix":\s*"\K[0-9][^"]+' "$TMPFILE" | while read -r cidr; do
+        grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | while read -r cidr; do
             echo "    $cidr 1;" >> "$OUTPUT_TMP"
         done
         echo "" >> "$OUTPUT_TMP"
@@ -81,10 +81,10 @@ log "拉取 AWS ..."
 AWS_TMP="$TEMP_DIR/aws.json"
 if curl -sfL --max-time 20 "$AWS_URL" -o "$AWS_TMP"; then
     echo "    # === AWS ===" >> "$OUTPUT_TMP"
-    grep -oP '"ip_prefix":\s*"\K[^"]+' "$AWS_TMP" | sort -u | while read -r cidr; do
+    grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" | sed 's/"ip_prefix":"//;s/"//' | sort -u | while read -r cidr; do
         echo "    $cidr 1;" >> "$OUTPUT_TMP"
     done
-    log "  AWS: $(grep -oP '"ip_prefix"' "$AWS_TMP" | wc -l) 条"
+    log "  AWS: $(grep -o '"ip_prefix"' "$AWS_TMP" | wc -l) 条"
     echo "" >> "$OUTPUT_TMP"
 else
     log "  [警告] AWS 拉取失败"

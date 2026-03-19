@@ -12,6 +12,27 @@ BOLD='\033[1m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; RESE
 echo -e "${BOLD}SubSieve — 更新${RESET}"
 echo "────────────────────────────────────────"
 
+# 检查 .env 文件是否存在，缺失则中止（重建容器会导致密钥等配置丢失）
+if [[ ! -f .env ]]; then
+    echo -e "${RED}❌ 未找到 .env 文件${RESET}"
+    echo ""
+    echo "   .env 包含管理密码、Secret Path 等关键配置，缺失后重建容器会导致："
+    echo "     • 管理后台无法访问（Secret Path 丢失）"
+    echo "     • 订阅网关无法启动（V2B_BACKEND 未设置）"
+    echo ""
+    echo "   解决方法："
+    echo "     1. 如有备份，将 .env 文件恢复到 $(pwd)/.env"
+    echo "     2. 如无备份，查阅 DEPLOY_INFO.txt 获取配置信息，"
+    echo "        然后重新运行 ./setup.sh 重新部署"
+    echo ""
+    if [[ -f DEPLOY_INFO.txt ]]; then
+        echo -e "${CYAN}当前 DEPLOY_INFO.txt 内容：${RESET}"
+        cat DEPLOY_INFO.txt
+        echo ""
+    fi
+    exit 1
+fi
+
 # 检查 git 仓库
 if [[ ! -d .git ]] && [[ ! -d ../.git ]]; then
     echo -e "${YELLOW}⚠  当前目录不是 git 仓库，无法自动拉取更新${RESET}"
