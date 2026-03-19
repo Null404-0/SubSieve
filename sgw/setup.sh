@@ -142,7 +142,10 @@ if [[ -n "$SSL_DOMAIN" ]]; then
         fi
 
         echo -e "${CYAN}正在为 ${SSL_DOMAIN} 申请 SSL 证书（需要80端口未被占用）…${RESET}"
-        if "$ACME_CMD" --issue -d "$SSL_DOMAIN" --standalone --httpport 80; then
+        "$ACME_CMD" --issue -d "$SSL_DOMAIN" --standalone --httpport 80 || _ACME_EXIT=$?
+        # 退出码 0 = 新申请成功；2 = 证书仍有效已跳过（RENEW_SKIP）
+        # 两种情况都直接安装证书到 ssl/
+        if [[ "${_ACME_EXIT:-0}" -eq 0 || "${_ACME_EXIT:-0}" -eq 2 ]]; then
             "$ACME_CMD" --install-cert -d "$SSL_DOMAIN" \
                 --cert-file  ssl/cert.pem \
                 --key-file   ssl/key.pem
