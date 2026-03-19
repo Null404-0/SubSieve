@@ -147,8 +147,8 @@ if [[ -n "$SSL_DOMAIN" ]]; then
         # 两种情况都直接安装证书到 ssl/
         if [[ "${_ACME_EXIT:-0}" -eq 0 || "${_ACME_EXIT:-0}" -eq 2 ]]; then
             "$ACME_CMD" --install-cert -d "$SSL_DOMAIN" \
-                --cert-file  ssl/cert.pem \
-                --key-file   ssl/key.pem
+                --fullchain-file ssl/cert.pem \
+                --key-file       ssl/key.pem
             echo -e "${GREEN}✅ 证书已安装到 ssl/${RESET}"
         else
             echo -e "${RED}❌ 证书申请失败，请检查：${RESET}"
@@ -224,7 +224,7 @@ docker compose up -d --build
 # ── 等待 gateway 初始化完成 ────────────────────────────────────
 echo -e "${CYAN}等待 gateway 初始化（拉取云IP库，请稍候）…${RESET}"
 for i in $(seq 1 60); do
-    if docker logs subscribe-gateway 2>&1 | grep -q "nginx 启动\|daemon off\|start worker"; then
+    if docker logs subscribe-gateway 2>&1 | grep -q "启动 nginx\|daemon off\|start worker"; then
         break
     fi
     sleep 3

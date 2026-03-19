@@ -49,7 +49,7 @@ for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; d
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
         grep -E '^[0-9]{1,3}\.' "$TMPFILE" | while read -r cidr; do
             echo "    $cidr 1;" >> "$OUTPUT_TMP"
-        done
+        done || true
         echo "" >> "$OUTPUT_TMP"
         log "  $NAME: ${COUNT} 条"
     else
@@ -64,12 +64,12 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
     if curl -sfL --max-time 20 \
         "https://stat.ripe.net/data/announced-prefixes/data.json?resource=${ASN}" \
         -o "$TMPFILE"; then
-        COUNT=$(grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | wc -l)
+        COUNT=$(grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | wc -l || echo 0)
         TOTAL=$((TOTAL + COUNT))
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
         grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | while read -r cidr; do
             echo "    $cidr 1;" >> "$OUTPUT_TMP"
-        done
+        done || true
         echo "" >> "$OUTPUT_TMP"
         log "  $NAME: ${COUNT} 条"
     else
@@ -83,8 +83,8 @@ if curl -sfL --max-time 20 "$AWS_URL" -o "$AWS_TMP"; then
     echo "    # === AWS ===" >> "$OUTPUT_TMP"
     grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" | sed 's/"ip_prefix":"//;s/"//' | sort -u | while read -r cidr; do
         echo "    $cidr 1;" >> "$OUTPUT_TMP"
-    done
-    log "  AWS: $(grep -o '"ip_prefix"' "$AWS_TMP" | wc -l) 条"
+    done || true
+    log "  AWS: $(grep -o '"ip_prefix"' "$AWS_TMP" | wc -l || echo 0) 条"
     echo "" >> "$OUTPUT_TMP"
 else
     log "  [警告] AWS 拉取失败"
