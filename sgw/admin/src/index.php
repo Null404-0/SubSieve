@@ -18,6 +18,22 @@ if (ADMIN_SECRET_PATH !== '') {
     $uri = substr($uri, strlen($prefix)) ?: '/';
 }
 
+// ── API 路由：直接 include 对应的 PHP 文件 ───────────────────
+// 修复：secret path 模式下 apiFetch 会带上前缀，nginx 转发到 index.php
+// 这里在剥离前缀后，将 /api/xxx.php 请求路由到实际文件
+if (str_starts_with($uri, '/api/')) {
+    $apiFile = realpath(__DIR__ . $uri);
+    $apiDir  = realpath(__DIR__ . '/api');
+    if ($apiFile && $apiDir && str_starts_with($apiFile, $apiDir . DIRECTORY_SEPARATOR)) {
+        require $apiFile;
+    } else {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'error' => 'Not found']);
+    }
+    exit;
+}
+
 // 退出
 if ($uri === '/logout') {
     session_destroy();

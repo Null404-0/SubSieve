@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
+      - "${GATEWAY_PORT:-443}:443"
     environment:
       - V2B_BACKEND=${V2B_BACKEND}
       - V2B_HOST=${V2B_HOST}
