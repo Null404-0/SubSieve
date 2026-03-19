@@ -2,12 +2,13 @@
 set -euo pipefail
 
 OUTPUT="/etc/nginx/subscribe/cloud_geo.conf"
+OUTPUT_TMP="${OUTPUT}.tmp"
 LOG_FILE="/var/log/subscribe/update_cloud_geo.log"
 TEMP_DIR=$(mktemp -d)
 SKIP_NGINX_RELOAD="${SKIP_NGINX_RELOAD:-0}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
-cleanup() { rm -rf "$TEMP_DIR"; }
+cleanup() { rm -rf "$TEMP_DIR" "$OUTPUT_TMP" 2>/dev/null || true; }
 trap cleanup EXIT
 
 declare -A SOURCES=(
@@ -27,7 +28,7 @@ AWS_URL="https://ip-ranges.amazonaws.com/ip-ranges.json"
 
 log "开始更新云厂商IP段..."
 
-cat > "$OUTPUT" <<EOF
+cat > "$OUTPUT_TMP" <<EOF
 # 由 update_cloud_geo.sh 自动生成 | $(date '+%Y-%m-%d %H:%M:%S')
 
 limit_req_zone \$binary_remote_addr zone=subscribe_limit:10m rate=20r/m;
@@ -45,11 +46,11 @@ for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; d
     if curl -sfL --max-time 15 "$URL" -o "$TMPFILE"; then
         COUNT=$(grep -cE '^[0-9]' "$TMPFILE" || true)
         TOTAL=$((TOTAL + COUNT))
-        echo "    # === $NAME ===" >> "$OUTPUT"
+        echo "    # === $NAME ===" >> "$OUTPUT_TMP"
         grep -E '^[0-9]{1,3}\.' "$TMPFILE" | while read -r cidr; do
-            echo "    $cidr 1;" >> "$OUTPUT"
+            echo "    $cidr 1;" >> "$OUTPUT_TMP"
         done
-        echo "" >> "$OUTPUT"
+        echo "" >> "$OUTPUT_TMP"
         log "  $NAME: ${COUNT} 条"
     else
         log "  [警告] $NAME 拉取失败"
@@ -65,11 +66,11 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
         -o "$TMPFILE"; then
         COUNT=$(grep -oP '"prefix":\s*"\K[0-9][^"]+' "$TMPFILE" | wc -l)
         TOTAL=$((TOTAL + COUNT))
-        echo "    # === $NAME ===" >> "$OUTPUT"
+        echo "    # === $NAME ===" >> "$OUTPUT_TMP"
         grep -oP '"prefix":\s*"\K[0-9][^"]+' "$TMPFILE" | while read -r cidr; do
-            echo "    $cidr 1;" >> "$OUTPUT"
+            echo "    $cidr 1;" >> "$OUTPUT_TMP"
         done
-        echo "" >> "$OUTPUT"
+        echo "" >> "$OUTPUT_TMP"
         log "  $NAME: ${COUNT} 条"
     else
         log "  [警告] $NAME 拉取失败"
@@ -79,17 +80,17 @@ done
 log "拉取 AWS ..."
 AWS_TMP="$TEMP_DIR/aws.json"
 if curl -sfL --max-time 20 "$AWS_URL" -o "$AWS_TMP"; then
-    echo "    # === AWS ===" >> "$OUTPUT"
+    echo "    # === AWS ===" >> "$OUTPUT_TMP"
     grep -oP '"ip_prefix":\s*"\K[^"]+' "$AWS_TMP" | sort -u | while read -r cidr; do
-        echo "    $cidr 1;" >> "$OUTPUT"
+        echo "    $cidr 1;" >> "$OUTPUT_TMP"
     done
     log "  AWS: $(grep -oP '"ip_prefix"' "$AWS_TMP" | wc -l) 条"
-    echo "" >> "$OUTPUT"
+    echo "" >> "$OUTPUT_TMP"
 else
     log "  [警告] AWS 拉取失败"
 fi
 
-cat >> "$OUTPUT" <<'EOF'
+cat >> "$OUTPUT_TMP" <<'EOF'
 }
 
 map $http_user_agent $bad_subscribe_ua {
@@ -109,6 +110,9 @@ map $http_user_agent $bad_subscribe_ua {
 EOF
 
 log "共 $TOTAL 条CIDR（不含AWS）"
+
+# 原子替换：写完整再覆盖，避免容器被杀时生成损坏的配置文件
+mv "$OUTPUT_TMP" "$OUTPUT"
 
 if [[ "$SKIP_NGINX_RELOAD" != "1" ]]; then
     nginx -t 2>/dev/null && nginx -s reload && log "✅ Nginx 重载成功" || log "❌ 配置测试失败"
