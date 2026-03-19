@@ -38,7 +38,7 @@ ask() {
 }
 
 # ── 随机生成函数 ───────────────────────────────────────────────
-gen_random() { head -c 48 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c "$1"; }
+gen_random() { head -c 48 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | tr -d 'IlO01' | head -c "$1"; }
 
 # ── 检查 .env → 决定是否重新生成凭证 ─────────────────────────
 REGEN_CREDS=true
