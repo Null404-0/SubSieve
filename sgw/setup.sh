@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================
-# setup.sh — 首次部署脚本
+# setup.sh — 首次部署脚本（支持断点续跑）
 # 自动生成随机密钥 → 写入 .env → 申请SSL → 启动容器 → 打印访问信息
 # =============================================================
 
@@ -12,80 +12,150 @@ cd "$(dirname "$0")"
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
+STATE_FILE=".setup_state"
+
 echo -e "${BOLD}SubSieve — 部署向导${RESET}"
 echo "────────────────────────────────────────"
 
-# ── 检查 .env 是否已存在 ──────────────────────────────────────
-if [[ -f .env ]]; then
-    echo -e "${YELLOW}⚠  检测到已有 .env 文件${RESET}"
-    read -rp "是否覆盖重新生成？(y/N): " CONFIRM
-    [[ "${CONFIRM,,}" != "y" ]] && echo "已取消。" && exit 0
+# ── 加载上次保存的输入 ─────────────────────────────────────────
+_S_V2B_HOST=""; _S_SUBSCRIBE_PATH=""; _S_GATEWAY_PORT=""; _S_SSL_DOMAIN=""
+if [[ -f "$STATE_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$STATE_FILE" 2>/dev/null || true
 fi
+
+# ── 辅助：带默认值的 read ──────────────────────────────────────
+ask() {
+    # ask "提示文字" "默认值" VARNAME
+    local prompt="$1" default="$2" var="$3" val
+    if [[ -n "$default" ]]; then
+        read -rp "${prompt} [${default}]: " val
+        printf -v "$var" '%s' "${val:-$default}"
+    else
+        read -rp "${prompt}: " val
+        printf -v "$var" '%s' "$val"
+    fi
+}
 
 # ── 随机生成函数 ───────────────────────────────────────────────
 gen_random() { head -c 48 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c "$1"; }
 
+# ── 检查 .env → 决定是否重新生成凭证 ─────────────────────────
+REGEN_CREDS=true
+ADMIN_USER="admin"; ADMIN_PASS=""; ADMIN_SECRET_PATH=""
+if [[ -f .env ]]; then
+    echo -e "${YELLOW}⚠  检测到已有 .env 文件${RESET}"
+    read -rp "是否重新生成账号密码和访问路径？(y/N): " _CONFIRM
+    if [[ "${_CONFIRM,,}" != "y" ]]; then
+        REGEN_CREDS=false
+        # 从现有 .env 逐行解析凭证（避免 source 副作用）
+        while IFS='=' read -r _key _val; do
+            [[ "$_key" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${_key// /}" ]] && continue
+            _key="${_key// /}"; _val="${_val// /}"
+            case "$_key" in
+                ADMIN_USER)        ADMIN_USER="$_val" ;;
+                ADMIN_PASS)        ADMIN_PASS="$_val" ;;
+                ADMIN_SECRET_PATH) ADMIN_SECRET_PATH="$_val" ;;
+            esac
+        done < .env
+        # 若解析失败则重新生成
+        if [[ -z "$ADMIN_PASS" || -z "$ADMIN_SECRET_PATH" ]]; then
+            echo -e "${YELLOW}⚠  无法从 .env 读取凭证，将重新生成${RESET}"
+            REGEN_CREDS=true
+        fi
+    fi
+fi
+
 # ── 收集机场信息 ───────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}请填写机场信息${RESET}"
-read -rp "机场地址（如 panel.yourdomain.com，不含 https://）: " V2B_HOST
+ask "机场地址（如 panel.yourdomain.com，不含 https://）" "$_S_V2B_HOST" V2B_HOST
 V2B_HOST="${V2B_HOST#https://}"
 V2B_BACKEND="https://${V2B_HOST}"
 
-read -rp "订阅路径（直接回车使用默认 /api/v1/client/subscribe）: " SUBSCRIBE_PATH
-SUBSCRIBE_PATH="${SUBSCRIBE_PATH:-/api/v1/client/subscribe}"
+ask "订阅路径（默认 /api/v1/client/subscribe）" "${_S_SUBSCRIBE_PATH:-/api/v1/client/subscribe}" SUBSCRIBE_PATH
 
-read -rp "请输入用来接收客户订阅请求的端口（直接回车默认 443）: " GATEWAY_PORT
-GATEWAY_PORT="${GATEWAY_PORT:-443}"
+ask "用来接收客户订阅请求的端口（默认 443）" "${_S_GATEWAY_PORT:-443}" GATEWAY_PORT
 
-# ── SSL 证书 ───────────────────────────────────────────────────
+# ── SSL 证书域名 ───────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}SSL 证书配置${RESET}"
 echo "  方式一：输入已解析到本机的域名，脚本自动申请证书"
 echo "  方式二：直接回车跳过，手动将证书放入 ssl/ 目录"
 echo ""
-read -rp "请输入域名（如 sub.yourdomain.com，留空跳过）: " SSL_DOMAIN
+ask "请输入域名（如 sub.yourdomain.com，留空跳过）" "$_S_SSL_DOMAIN" SSL_DOMAIN
 SSL_DOMAIN="${SSL_DOMAIN#https://}"
 SSL_DOMAIN="${SSL_DOMAIN%%/*}"
 
+# ── 持久化本次输入（下次重跑时作为默认值）────────────────────
+cat > "$STATE_FILE" <<EOF
+_S_V2B_HOST="${V2B_HOST}"
+_S_SUBSCRIBE_PATH="${SUBSCRIBE_PATH}"
+_S_GATEWAY_PORT="${GATEWAY_PORT}"
+_S_SSL_DOMAIN="${SSL_DOMAIN}"
+EOF
+
 mkdir -p ssl
 
+# ── SSL 证书申请 ───────────────────────────────────────────────
 if [[ -n "$SSL_DOMAIN" ]]; then
-    # 查找 acme.sh
-    ACME_CMD=""
-    if [[ -f "$HOME/.acme.sh/acme.sh" ]]; then
-        ACME_CMD="$HOME/.acme.sh/acme.sh"
-    elif command -v acme.sh &>/dev/null; then
-        ACME_CMD="acme.sh"
-    fi
-
-    if [[ -z "$ACME_CMD" ]]; then
-        echo -e "${YELLOW}未检测到 acme.sh，正在安装…${RESET}"
-        # acme.sh 需要 cron 来设置自动续期任务，Debian/Ubuntu 默认未安装
-        if ! command -v crontab &>/dev/null; then
-            echo -e "${YELLOW}正在安装 cron（acme.sh 自动续期所需）…${RESET}"
-            apt-get install -y -q cron 2>/dev/null || true
+    # 检查证书是否已存在且域名匹配
+    _CERT_OK=false
+    if [[ -f ssl/cert.pem && -f ssl/key.pem ]]; then
+        if command -v openssl &>/dev/null; then
+            _CERT_DOMAINS=$(openssl x509 -noout -text -in ssl/cert.pem 2>/dev/null \
+                | grep -oP '(?<=DNS:)[^,\s]+' | tr '\n' ' ' || true)
+            # CN 兜底
+            if [[ -z "$_CERT_DOMAINS" ]]; then
+                _CERT_DOMAINS=$(openssl x509 -noout -subject -in ssl/cert.pem 2>/dev/null \
+                    | grep -oP 'CN\s*=\s*\K[^,/]+' || true)
+            fi
+            echo "$_CERT_DOMAINS" | grep -qF "$SSL_DOMAIN" && _CERT_OK=true
+        else
+            _CERT_OK=true   # openssl 不可用时信任已有文件
         fi
-        curl -fsSL https://get.acme.sh | sh -s "email=admin@${SSL_DOMAIN}"
-        # shellcheck source=/dev/null
-        source "$HOME/.bashrc" 2>/dev/null || true
-        ACME_CMD="$HOME/.acme.sh/acme.sh"
     fi
 
-    echo -e "${CYAN}正在为 ${SSL_DOMAIN} 申请 SSL 证书（需要80端口未被占用）…${RESET}"
-    if "$ACME_CMD" --issue -d "$SSL_DOMAIN" --standalone --httpport 80; then
-        "$ACME_CMD" --install-cert -d "$SSL_DOMAIN" \
-            --cert-file  ssl/cert.pem \
-            --key-file   ssl/key.pem
-        echo -e "${GREEN}✅ 证书已安装到 ssl/${RESET}"
+    if [[ "$_CERT_OK" == "true" ]]; then
+        echo -e "${GREEN}✅ 检测到 ${SSL_DOMAIN} 的有效证书，跳过申请${RESET}"
     else
-        echo -e "${RED}❌ 证书申请失败，请检查：${RESET}"
-        echo "   1. 域名 ${SSL_DOMAIN} 是否已正确解析到本机"
-        echo "   2. 80 端口是否未被占用（sudo lsof -i :80）"
-        echo "   3. 防火墙是否放行了 80 端口"
-        echo ""
-        echo -e "${YELLOW}你可以手动申请后将证书放到 ssl/cert.pem 和 ssl/key.pem，再运行 docker compose up -d --build${RESET}"
-        exit 1
+        # 查找 acme.sh
+        ACME_CMD=""
+        if [[ -f "$HOME/.acme.sh/acme.sh" ]]; then
+            ACME_CMD="$HOME/.acme.sh/acme.sh"
+        elif command -v acme.sh &>/dev/null; then
+            ACME_CMD="acme.sh"
+        fi
+
+        if [[ -z "$ACME_CMD" ]]; then
+            echo -e "${YELLOW}未检测到 acme.sh，正在安装…${RESET}"
+            # acme.sh 需要 cron 来设置自动续期任务，Debian/Ubuntu 默认未安装
+            if ! command -v crontab &>/dev/null; then
+                echo -e "${YELLOW}正在安装 cron（acme.sh 自动续期所需）…${RESET}"
+                apt-get install -y -q cron 2>/dev/null || true
+            fi
+            curl -fsSL https://get.acme.sh | sh -s "email=admin@${SSL_DOMAIN}"
+            # shellcheck source=/dev/null
+            source "$HOME/.bashrc" 2>/dev/null || true
+            ACME_CMD="$HOME/.acme.sh/acme.sh"
+        fi
+
+        echo -e "${CYAN}正在为 ${SSL_DOMAIN} 申请 SSL 证书（需要80端口未被占用）…${RESET}"
+        if "$ACME_CMD" --issue -d "$SSL_DOMAIN" --standalone --httpport 80; then
+            "$ACME_CMD" --install-cert -d "$SSL_DOMAIN" \
+                --cert-file  ssl/cert.pem \
+                --key-file   ssl/key.pem
+            echo -e "${GREEN}✅ 证书已安装到 ssl/${RESET}"
+        else
+            echo -e "${RED}❌ 证书申请失败，请检查：${RESET}"
+            echo "   1. 域名 ${SSL_DOMAIN} 是否已正确解析到本机"
+            echo "   2. 80 端口是否未被占用（sudo lsof -i :80）"
+            echo "   3. 防火墙是否放行了 80 端口"
+            echo ""
+            echo -e "${YELLOW}修复后直接重新运行 ./setup.sh，已填写的信息会自动保留${RESET}"
+            exit 1
+        fi
     fi
 else
     SSL_DOMAIN=""
@@ -104,11 +174,26 @@ else
     fi
 fi
 
-# ── 随机生成账号密码和访问路径 ────────────────────────────────
-ADMIN_USER="admin"
-ADMIN_PASS="$(gen_random 16)"
-ADMIN_SECRET_PATH="$(gen_random 12)"
+# ── 检测并安装 Docker ──────────────────────────────────────────
+if ! command -v docker &>/dev/null; then
+    echo ""
+    echo -e "${YELLOW}未检测到 Docker，正在自动安装…${RESET}"
+    curl -fsSL https://get.docker.com | sh
+    systemctl enable --now docker 2>/dev/null || true
+    echo -e "${GREEN}✅ Docker 安装完成${RESET}"
+    echo ""
+elif ! docker info &>/dev/null 2>&1; then
+    echo -e "${YELLOW}Docker 已安装但未运行，正在启动…${RESET}"
+    systemctl start docker 2>/dev/null || true
+fi
+
+# ── 生成/保留凭证 ──────────────────────────────────────────────
 GATEWAY_CONTAINER="subscribe-gateway"
+if [[ "$REGEN_CREDS" == "true" ]]; then
+    ADMIN_USER="admin"
+    ADMIN_PASS="$(gen_random 16)"
+    ADMIN_SECRET_PATH="$(gen_random 12)"
+fi
 
 # ── 写入 .env ─────────────────────────────────────────────────
 cat > .env <<EOF
