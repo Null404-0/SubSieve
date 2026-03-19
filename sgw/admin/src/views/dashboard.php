@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SubSieve Admin</title>
+<title>Subscribe Gateway</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0f1117;color:#e2e8f0;font:14px/1.5 system-ui,sans-serif;display:flex;min-height:100vh}
@@ -40,38 +40,26 @@ body{background:#0f1117;color:#e2e8f0;font:14px/1.5 system-ui,sans-serif;display
 .card-title{font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
 
 /* Log panel */
-.log-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.log-filter{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:7px 12px;border-radius:7px;font-size:12px;outline:none;width:160px}
+.log-controls{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.log-filter{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:7px 12px;border-radius:7px;font-size:12px;outline:none;width:180px}
 .log-filter:focus{border-color:#6366f1}
-.log-mode-btns{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
-.mode-btn{background:#1e2236;border:1px solid #2d3144;color:#94a3b8;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;transition:all .15s}
-.mode-btn:hover{border-color:#6366f1;color:#6366f1}
-.mode-btn.active{background:#6366f1;border-color:#6366f1;color:#fff}
-.mode-btn.danger{border-color:rgba(239,68,68,.3);color:#ef4444}
-.mode-btn.danger:hover{background:rgba(239,68,68,.15)}
-.radio-group{display:flex;align-items:center;gap:14px;margin-left:auto}
-.radio-group label{display:flex;align-items:center;gap:5px;color:#94a3b8;font-size:12px;cursor:pointer;white-space:nowrap}
-.radio-group input[type=radio]{accent-color:#6366f1}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:500}
 .badge-200{background:rgba(34,197,94,.12);color:#22c55e}
 .badge-403{background:rgba(239,68,68,.12);color:#ef4444}
 .badge-429{background:rgba(234,179,8,.12);color:#eab308}
 .badge-444{background:rgba(100,116,139,.12);color:#64748b}
 .badge-other{background:rgba(99,102,241,.12);color:#6366f1}
-.log-table-wrap{overflow:auto;max-height:520px}
+.log-table-wrap{overflow:auto;max-height:480px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:left;padding:8px 10px;color:#64748b;border-bottom:1px solid #1e2236;position:sticky;top:0;background:#1a1d2e;white-space:nowrap}
 td{padding:7px 10px;border-bottom:1px solid #13161f;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(99,102,241,.04)}
-.ip-cell{font-family:monospace;font-size:11px;white-space:nowrap}
-.ua-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}
-.req-cell{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#94a3b8}
-.token-cell{font-family:monospace;font-size:11px;color:#818cf8;display:flex;align-items:center;gap:6px;min-width:0}
-.token-text{word-break:break-all;flex:1}
+.ip-cell{font-family:monospace;font-size:11px}
+.ua-cell{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}
+.req-cell{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#94a3b8}
+.token-cell{font-family:monospace;font-size:11px;color:#818cf8}
 .auto-timer{color:#64748b;font-size:11px}
-.copy-btn{background:none;border:1px solid #2d3144;color:#64748b;padding:1px 6px;border-radius:4px;cursor:pointer;font-size:10px;flex-shrink:0;transition:all .15s}
-.copy-btn:hover{border-color:#6366f1;color:#6366f1}
 
 /* Stats */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
@@ -81,10 +69,10 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .top-val{font-family:monospace;font-size:12px;flex:1;padding:0 10px;word-break:break-all}
 .top-count{color:#6366f1;font-size:12px;font-weight:600;white-space:nowrap}
 .top-sub{color:#64748b;font-size:11px}
-.add-btn-sm{background:#6366f1;color:#fff;border:none;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;transition:opacity .15s;flex-shrink:0}
+.add-btn-sm{background:#6366f1;color:#fff;border:none;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;margin-left:8px;transition:opacity .15s}
 .add-btn-sm:hover{opacity:.8}
 
-/* Whitelist / Blacklist / UA */
+/* Whitelist / Blacklist */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .ip-input{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:9px 12px;border-radius:8px;font-size:13px;font-family:monospace;outline:none;flex:1;min-width:160px}
 .ip-input:focus{border-color:#6366f1}
@@ -112,15 +100,12 @@ tr:hover td{background:rgba(99,102,241,.04)}
 <body>
 
 <nav class="sidebar">
-  <div class="logo">Sub<span>Sieve</span></div>
+  <div class="logo">Gateway<span>.</span>Admin</div>
   <button class="nav-item active" onclick="switchTab('logs',this)">
-    <span class="nav-icon">📋</span>日志
+    <span class="nav-icon">📋</span>今日日志
   </button>
   <button class="nav-item" onclick="switchTab('stats',this)">
     <span class="nav-icon">📊</span>分析
-  </button>
-  <button class="nav-item" onclick="switchTab('ua_blacklist',this)">
-    <span class="nav-icon">🛡</span>封禁UA
   </button>
   <button class="nav-item" onclick="switchTab('whitelist',this)">
     <span class="nav-icon">✅</span>白名单
@@ -137,7 +122,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
 
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title" id="tab-title">日志</div>
+    <div class="topbar-title" id="tab-title">今日日志</div>
     <div class="topbar-right">
       <span class="status-dot"></span>
       <span class="status-text">运行中</span>
@@ -151,22 +136,11 @@ tr:hover td{background:rgba(99,102,241,.04)}
     <!-- ─── 日志 ─────────────────────────────────────────── -->
     <div class="tab-panel active" id="panel-logs">
       <div class="card">
-        <!-- 日志模式切换 -->
-        <div class="log-mode-btns">
-          <button class="mode-btn active" id="btn-today" onclick="setLogMode('today')">仅显示今日日志</button>
-          <button class="mode-btn" id="btn-all" onclick="setLogMode('all')">显示全部日志</button>
-          <button class="mode-btn danger" onclick="deleteLogs()">删除7日前的日志</button>
-        </div>
-        <!-- 过滤器 -->
         <div class="log-controls">
           <input class="log-filter" id="filter-ip" placeholder="过滤 IP" oninput="renderLogs()">
           <input class="log-filter" id="filter-status" placeholder="状态码 如 403" oninput="renderLogs()">
           <input class="log-filter" id="filter-token" placeholder="过滤 Token" oninput="renderLogs()">
           <span class="auto-timer" id="log-count">—</span>
-          <div class="radio-group">
-            <label><input type="radio" name="sub-filter" value="subscribe" onchange="renderLogs()"> 仅订阅相关</label>
-            <label><input type="radio" name="sub-filter" value="all" checked onchange="renderLogs()"> 显示全部</label>
-          </div>
         </div>
         <div class="log-table-wrap">
           <table>
@@ -197,22 +171,6 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div class="card-title">可疑 UA（触发403）</div>
           <div id="bad-uas"><div class="loading">加载中…</div></div>
         </div>
-      </div>
-    </div>
-
-    <!-- ─── 封禁UA ─────────────────────────────────────────── -->
-    <div class="tab-panel" id="panel-ua_blacklist">
-      <div class="card">
-        <div class="card-title">添加封禁 UA</div>
-        <div class="ip-form">
-          <input class="ip-input" id="ua-keyword" placeholder="UA 关键词（如 python-requests、clash）">
-          <input class="comment-input" id="ua-comment" placeholder="备注（可选）">
-          <button class="btn-primary" onclick="uaAdd()">添加并立即生效</button>
-        </div>
-        <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
-          ⚡ 封禁 UA 后立即 reload nginx 生效，大小写不敏感，支持关键词匹配
-        </div>
-        <div id="ua-list"><div class="loading">加载中…</div></div>
       </div>
     </div>
 
@@ -258,14 +216,12 @@ tr:hover td{background:rgba(99,102,241,.04)}
 // ── 状态 ─────────────────────────────────────────────────────
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
 let allLogs = [];
-let logMode = 'today';   // 'today' | 'all'
 let autoTimer, countdown = 300;
 const TABS = {
-  logs:         {title:'日志',     loader:loadLogs},
-  stats:        {title:'分析',     loader:loadStats},
-  ua_blacklist: {title:'封禁UA',   loader:loadUaBlacklist},
-  whitelist:    {title:'白名单',   loader:loadWhitelist},
-  blacklist:    {title:'黑名单',   loader:loadBlacklist},
+  logs:      {title:'今日日志', loader:loadLogs},
+  stats:     {title:'分析',     loader:loadStats},
+  whitelist: {title:'白名单',   loader:loadWhitelist},
+  blacklist: {title:'黑名单',   loader:loadBlacklist},
 };
 let currentTab = 'logs';
 
@@ -327,27 +283,12 @@ function statusBadge(code) {
 }
 
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function copyText(text) {
-  navigator.clipboard.writeText(text)
-    .then(() => toast('已复制'))
-    .catch(() => toast('复制失败，请手动复制','err'));
-}
-
-// ── 日志模式切换 ───────────────────────────────────────────────
-function setLogMode(mode) {
-  logMode = mode;
-  document.getElementById('btn-today').classList.toggle('active', mode === 'today');
-  document.getElementById('btn-all').classList.toggle('active', mode === 'all');
-  loadLogs();
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
-  document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
-  const data = await apiFetch('/api/logs.php?mode=' + logMode);
+  const data = await apiFetch('/api/logs.php');
   if (!data.ok) { toast('加载日志失败', 'err'); return; }
   allLogs = data.logs || [];
   renderLogs();
@@ -357,11 +298,9 @@ function renderLogs() {
   const fIp     = document.getElementById('filter-ip').value.trim().toLowerCase();
   const fStatus = document.getElementById('filter-status').value.trim();
   const fToken  = document.getElementById('filter-token').value.trim().toLowerCase();
-  const subOnly = document.querySelector('input[name="sub-filter"][value="subscribe"]').checked;
 
   let rows = allLogs.filter(l => {
-    if (subOnly && !l.request.includes('/api/v1/client/subscribe')) return false;
-    if (fIp     && !l.ip.toLowerCase().includes(fIp)) return false;
+    if (fIp     && !l.ip.includes(fIp)) return false;
     if (fStatus && String(l.status) !== fStatus) return false;
     if (fToken  && !l.token.toLowerCase().includes(fToken)) return false;
     return true;
@@ -374,15 +313,11 @@ function renderLogs() {
 
   if (!rows.length) {
     document.getElementById('log-tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
+      '<tr><td colspan="7" class="empty">今日暂无匹配记录</td></tr>';
     return;
   }
 
-  document.getElementById('log-tbody').innerHTML = rows.map(l => {
-    const tokenHtml = l.token
-      ? `<div class="token-cell"><span class="token-text" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" onclick="copyText('${esc(l.token)}')">复制</button></div>`
-      : '—';
-    return `
+  document.getElementById('log-tbody').innerHTML = rows.map(l => `
     <tr>
       <td style="white-space:nowrap;color:#64748b;font-size:11px">${esc(l.time)}</td>
       <td class="ip-cell">
@@ -390,26 +325,11 @@ function renderLogs() {
         <button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>
       </td>
       <td>${statusBadge(l.status)}</td>
-      <td style="min-width:120px;max-width:220px">${tokenHtml}</td>
+      <td class="token-cell" title="${esc(l.token)}">${esc(l.token_short) || '—'}</td>
       <td class="req-cell" title="${esc(l.request)}">${esc(l.request)}</td>
       <td class="ua-cell" title="${esc(l.ua)}">${esc(l.ua) || '—'}</td>
       <td></td>
-    </tr>`;
-  }).join('');
-}
-
-async function deleteLogs() {
-  if (!confirm('确定要删除7天前的所有日志行吗？\n此操作不可撤销。')) return;
-  const d = await apiFetch('/api/logs.php', {
-    method: 'DELETE',
-    headers: {'X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) {
-    toast(`✅ 已删除 ${d.deleted} 行，保留 ${d.kept} 行`);
-    loadLogs();
-  } else {
-    toast(d.error || '删除失败', 'err');
-  }
+    </tr>`).join('');
 }
 
 // ── 分析 ──────────────────────────────────────────────────────
@@ -438,85 +358,22 @@ async function loadStats() {
   const tokHtml = (data.top_tokens||[]).length ? (data.top_tokens||[]).map((r,i) => `
     <div class="top-row">
       <span class="top-rank">${i+1}</span>
-      <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
-        <span class="token-text" title="${esc(r.token_full)}">${esc(r.token_full)}</span>
-        <button class="copy-btn" onclick="copyText('${esc(r.token_full)}')">复制</button>
-      </span>
-      <span class="top-count" style="white-space:nowrap;margin-left:6px">${r.count}次</span>
+      <span class="top-val token-cell" title="${esc(r.token_full)}">${esc(r.token)}</span>
+      <span class="top-count">${r.count}次</span>
       <span class="top-sub" style="margin-left:8px">${esc(r.last_time)}</span>
     </div>`).join('') : '<div class="empty">暂无数据</div>';
   document.getElementById('top-tokens').innerHTML = tokHtml;
 
   // 可疑 UA
   const uaHtml = (data.bad_uas||[]).length ? `
-    <table><thead><tr><th>UA</th><th>403次数</th><th>操作</th></tr></thead>
+    <table><thead><tr><th>UA</th><th>403次数</th></tr></thead>
     <tbody>${(data.bad_uas||[]).map(r => `
       <tr>
         <td class="ua-cell" style="max-width:500px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
         <td style="color:#ef4444;font-weight:600">${r.count}</td>
-        <td><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
       </tr>`).join('')}
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
   document.getElementById('bad-uas').innerHTML = uaHtml;
-}
-
-// ── 封禁UA ─────────────────────────────────────────────────────
-async function loadUaBlacklist() {
-  const data = await apiFetch('/api/ua_blacklist.php');
-  if (!data.ok) { toast('加载失败','err'); return; }
-  const entries = data.entries || [];
-  if (!entries.length) {
-    document.getElementById('ua-list').innerHTML = '<div class="empty">封禁列表为空</div>';
-    return;
-  }
-  document.getElementById('ua-list').innerHTML = `
-    <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
-    <tbody>${entries.map(e => `
-      <tr>
-        <td class="ip-cell">${esc(e.ua)}</td>
-        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
-        <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
-        <td><button class="btn-danger" onclick="uaDel('${esc(e.ua)}')">移除</button></td>
-      </tr>`).join('')}
-    </tbody></table>`;
-}
-
-async function uaAdd() {
-  const ua  = document.getElementById('ua-keyword').value.trim();
-  const cmt = document.getElementById('ua-comment').value.trim();
-  if (!ua) { toast('请输入 UA 关键词','err'); return; }
-  const d = await apiFetch('/api/ua_blacklist.php', {
-    method:'POST', body:JSON.stringify({ua, comment:cmt}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) {
-    document.getElementById('ua-keyword').value = '';
-    document.getElementById('ua-comment').value = '';
-    toast('✅ 已封禁并立即生效');
-    loadUaBlacklist();
-  } else {
-    toast(d.error||'添加失败','err');
-  }
-}
-
-async function uaDel(ua) {
-  const d = await apiFetch('/api/ua_blacklist.php', {
-    method:'DELETE', body:JSON.stringify({ua}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) { toast('✅ 已移除并立即生效'); loadUaBlacklist(); }
-  else toast(d.error||'移除失败','err');
-}
-
-async function quickBanUA(ua) {
-  const cmt = prompt(`封禁 UA "${ua}"，备注（可留空）：`);
-  if (cmt === null) return;
-  const d = await apiFetch('/api/ua_blacklist.php', {
-    method:'POST', body:JSON.stringify({ua, comment:cmt}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) toast(`✅ UA 已封禁`);
-  else toast(d.error||'封禁失败','err');
 }
 
 // ── 白名单 ────────────────────────────────────────────────────
@@ -621,7 +478,7 @@ async function blDel(ip) {
   else toast(d.error||'解封失败','err');
 }
 
-// ── 快捷封禁 IP（从日志/分析页直接封） ──────────────────────────
+// ── 快捷封禁（从日志/分析页直接封） ────────────────────────────
 async function quickBlacklist(ip) {
   const cmt = prompt(`封禁 ${ip}，备注（可留空）：`);
   if (cmt === null) return;
