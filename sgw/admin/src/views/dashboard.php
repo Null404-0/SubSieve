@@ -309,8 +309,13 @@ function manualRefresh() {
 
 // ── 工具 ──────────────────────────────────────────────────────
 async function apiFetch(url, opts={}) {
-  const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
-  return r.json();
+  try {
+    const r = await fetch(BASE + url, {headers:{'X-Requested-With':'XMLHttpRequest'}, ...opts});
+    const json = await r.json();
+    return json;
+  } catch(e) {
+    return {ok: false, error: e.message || '网络请求失败'};
+  }
 }
 
 function toast(msg, type='ok') {
@@ -348,7 +353,10 @@ function setLogMode(mode) {
 async function loadLogs() {
   document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
   const data = await apiFetch('/api/logs.php?mode=' + logMode);
-  if (!data.ok) { toast('加载日志失败', 'err'); return; }
+  if (!data.ok) {
+    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(data.error||'未知错误') + '</td></tr>';
+    toast('加载日志失败: ' + (data.error||''), 'err'); return;
+  }
   allLogs = data.logs || [];
   renderLogs();
 }
@@ -415,7 +423,12 @@ async function deleteLogs() {
 // ── 分析 ──────────────────────────────────────────────────────
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
-  if (!data.ok) { toast('加载统计失败', 'err'); return; }
+  if (!data.ok) {
+    ['top-ips','top-tokens','bad-uas'].forEach(id => {
+      document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
+    });
+    toast('加载统计失败: ' + (data.error||''), 'err'); return;
+  }
 
   // Top IP
   const ipHtml = (data.top_ips||[]).length ? (data.top_ips||[]).map((r,i) => `
@@ -463,7 +476,10 @@ async function loadStats() {
 // ── 封禁UA ─────────────────────────────────────────────────────
 async function loadUaBlacklist() {
   const data = await apiFetch('/api/ua_blacklist.php');
-  if (!data.ok) { toast('加载失败','err'); return; }
+  if (!data.ok) {
+    document.getElementById('ua-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
+    toast('加载失败: ' + (data.error||''), 'err'); return;
+  }
   const entries = data.entries || [];
   if (!entries.length) {
     document.getElementById('ua-list').innerHTML = '<div class="empty">封禁列表为空</div>';
@@ -522,7 +538,10 @@ async function quickBanUA(ua) {
 // ── 白名单 ────────────────────────────────────────────────────
 async function loadWhitelist() {
   const data = await apiFetch('/api/whitelist.php');
-  if (!data.ok) { toast('加载失败','err'); return; }
+  if (!data.ok) {
+    document.getElementById('wl-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
+    toast('加载失败: ' + (data.error||''), 'err'); return;
+  }
   const entries = data.entries || [];
   if (!entries.length) {
     document.getElementById('wl-list').innerHTML = '<div class="empty">白名单为空</div>';
@@ -576,7 +595,10 @@ async function wlApply() {
 // ── 黑名单 ────────────────────────────────────────────────────
 async function loadBlacklist() {
   const data = await apiFetch('/api/blacklist.php');
-  if (!data.ok) { toast('加载失败','err'); return; }
+  if (!data.ok) {
+    document.getElementById('bl-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
+    toast('加载失败: ' + (data.error||''), 'err'); return;
+  }
   const entries = data.entries || [];
   if (!entries.length) {
     document.getElementById('bl-list').innerHTML = '<div class="empty">黑名单为空</div>';
