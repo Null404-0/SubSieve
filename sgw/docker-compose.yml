@@ -26,6 +26,7 @@ services:
     environment:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASS=${ADMIN_PASS}
+      - ADMIN_SECRET_PATH=${ADMIN_SECRET_PATH}
       - GATEWAY_CONTAINER=subscribe-gateway
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
