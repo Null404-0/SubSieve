@@ -29,7 +29,7 @@ if ($method === 'POST') {
         'added_at' => date('Y-m-d H:i'),
     ];
 
-    write_blacklist($entries);
+    if (!write_blacklist($entries)) json_err('写入黑名单文件失败，请检查文件权限');
     $reload = nginx_reload();
 
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
@@ -43,7 +43,7 @@ if ($method === 'DELETE') {
     if (!$ip) json_err('缺少 ip 参数');
 
     $entries = array_filter(read_blacklist(), fn($e) => $e['ip'] !== $ip);
-    write_blacklist(array_values($entries));
+    if (!write_blacklist(array_values($entries))) json_err('写入黑名单文件失败，请检查文件权限');
     $reload = nginx_reload();
 
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
@@ -59,9 +59,9 @@ function read_blacklist(): array {
     return is_array($data) ? $data : [];
 }
 
-function write_blacklist(array $entries): void {
+function write_blacklist(array $entries): bool {
     // 写 JSON（含元数据）
-    file_put_contents(BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    $r1 = file_put_contents(BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
     // 生成 nginx deny conf（返回444，比403更彻底）
     $lines = ["# 黑名单 - 由 admin 自动生成 | " . date('Y-m-d H:i:s')];
@@ -69,5 +69,7 @@ function write_blacklist(array $entries): void {
         $cmt = $e['comment'] ? " # {$e['comment']} ({$e['added_at']})" : " # {$e['added_at']}";
         $lines[] = "deny {$e['ip']};{$cmt}";
     }
-    file_put_contents(BLACKLIST_CONF, implode("\n", $lines) . "\n", LOCK_EX);
+    $r2 = file_put_contents(BLACKLIST_CONF, implode("\n", $lines) . "\n", LOCK_EX);
+
+    return $r1 !== false && $r2 !== false;
 }
