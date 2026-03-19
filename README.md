@@ -1,77 +1,141 @@
-# Subscribe Gateway
+# SubSieve
 
 订阅清洗网关 + 可视化管理后台，Docker Compose 一键部署。
 
 ## 目录结构
 
 ```
-sgw-v2/
+sgw/
+├── setup.sh                 ← 首次部署向导（一键运行）
+├── update.sh                ← 已安装用户更新脚本
 ├── docker-compose.yml
-├── .env.example
-├── whitelist_ips.txt        ← 白名单（后台管理 或 直接编辑）
+├── .env                     ← 由 setup.sh 自动生成，含账号密码等敏感信息
+├── DEPLOY_INFO.txt          ← 部署完成后生成，记录访问地址和账号
 ├── ssl/
-│   ├── cert.pem
+│   ├── cert.pem             ← 由 setup.sh 自动申请，或手动放入
 │   └── key.pem
 ├── gateway/                 ← nginx 拦截 + proxy_pass
 │   ├── Dockerfile
-│   ├── nginx/nginx.conf
-│   ├── nginx/subscribe_protect.conf.template
+│   ├── nginx/
+│   │   ├── nginx.conf
+│   │   └── subscribe_protect.conf.template
 │   └── scripts/
 │       ├── entrypoint.sh
-│       ├── update_cloud_geo.sh   ← 周更新云IP库
-│       └── reload_whitelist.sh   ← 白名单生效
+│       ├── update_cloud_geo.sh   ← 每周自动更新云IP库
+│       └── reload_whitelist.sh   ← 白名单生效脚本
 └── admin/                   ← PHP 管理后台
     ├── Dockerfile
     ├── nginx.conf
     └── src/
-        ├── index.php             ← 路由 + 鉴权
-        ├── config.php            ← 配置 + 工具函数
+        ├── index.php             ← 路由 + 鉴权 + API转发
+        ├── config.php            ← 配置常量 + 工具函数
         ├── api/
         │   ├── _auth.php         ← API 鉴权中间件
-        │   ├── logs.php          ← 今日日志
+        │   ├── logs.php          ← 日志读取 / 删除旧日志
         │   ├── stats.php         ← IP/Token/UA 分析
         │   ├── whitelist.php     ← 白名单 CRUD
-        │   └── blacklist.php     ← 黑名单（nginx deny，即时生效）
+        │   ├── blacklist.php     ← 黑名单（nginx deny，即时生效）
+        │   └── ua_blacklist.php  ← 自定义封禁UA（nginx map，即时生效）
         └── views/
             ├── login.php
-            └── dashboard.php     ← 主界面（4个选项卡）
+            └── dashboard.php     ← 主界面（5个选项卡）
 ```
 
-## 部署步骤
+---
+
+## 首次部署
+
+### 前置要求
+
+- 一台有公网 IP 的 VPS（Linux）
+- 已安装 Docker + Docker Compose
+- 如需自动申请 SSL 证书：提前把域名解析到本机（A 记录），且 **80 端口未被占用**
+
+### 一键部署
 
 ```bash
-# 1. 配置
-cp .env.example .env
-vi .env   # 填写 V2B_BACKEND / V2B_HOST / ADMIN_PASS
-
-# 2. 放入 SSL 证书
-cp /path/to/cert.pem ssl/cert.pem
-cp /path/to/key.pem  ssl/key.pem
-
-# 3. 启动
-docker compose up -d --build
-
-# 4. 查看启动日志
-docker logs -f subscribe-gateway
-docker logs -f subscribe-admin
+git clone https://github.com/Null404-0/SubSieve.git
+cd SubSieve/sgw
+chmod +x setup.sh
+./setup.sh
 ```
+
+向导会依次询问：
+
+| 提示 | 说明 |
+|------|------|
+| 机场地址 | 你的机场面板域名，如 `panel.example.com`，不含 `https://` |
+| 订阅路径 | 默认 `/api/v1/client/subscribe`，直接回车即可 |
+| 订阅端口 | 客户端订阅链接使用的端口，默认 `443` |
+| 域名（SSL） | 输入已解析到本机的域名，脚本自动调用 acme.sh 申请证书；留空则手动放证书 |
+
+部署完成后，访问信息会打印在终端，同时保存到 `DEPLOY_INFO.txt`。
+
+---
+
+## 后续更新
+
+已部署的用户，直接运行：
+
+```bash
+cd SubSieve/sgw
+./update.sh
+```
+
+脚本会自动 git pull 最新代码、保留 `.env`、重新构建容器。
+
+---
 
 ## 访问后台
 
-`https://你的域名:64444`
+```
+https://你的域名或IP:64444/<随机路径>
+```
 
-用户名密码在 `.env` 中配置。
+路径和账号密码见 `DEPLOY_INFO.txt`，或查看 `.env` 中的 `ADMIN_SECRET_PATH` / `ADMIN_PASS`。
+
+---
 
 ## 后台功能
 
 | 选项卡 | 功能 |
 |--------|------|
-| 今日日志 | 实时展示今日访问记录，可按 IP/状态码/Token 过滤，一键封禁 |
-| 分析 | Top10 IP、Top10 Token、可疑UA列表，支持快速封禁 |
-| 白名单 | 增删白名单IP，点击"生效"触发 nginx reload |
-| 黑名单 | 增删黑名单IP（nginx deny），增删后立即生效 |
+| 日志 | 今日/全部日志切换，按 IP / 状态码 / Token 过滤，仅显示订阅相关，Token 全文展示并支持一键复制，一键封禁 IP，删除7日前的日志 |
+| 分析 | Top10 IP、Top10 Token（支持复制）、可疑 UA 列表（可一键封禁 UA） |
+| 封禁UA | 添加/删除自定义封禁 UA 关键词，大小写不敏感，立即 reload nginx 生效 |
+| 白名单 | 增删白名单 IP，点击"生效"触发 nginx reload |
+| 黑名单 | 增删黑名单 IP（nginx deny），增删后立即生效 |
 
-## 后续扩展预留
+---
 
-- `config.php` 末尾有 `v2b_get_user_by_token()` 函数接口，填充后即可在分析页展示 token 对应用户
-- 新增 API 模块：在 `admin/src/api/` 新建 PHP 文件，在 `dashboard.php` 加一个 Tab 即可
+## 拦截层说明
+
+订阅请求经过以下过滤层后才会反代到机场后端：
+
+1. **黑名单**：精确 IP 封禁，`deny` 返回 444
+2. **云厂商 IP**：自动识别阿里云、腾讯云、字节、华为云、Google、AWS、Azure、DigitalOcean 等云服务器 IP，返回 403
+3. **可疑 UA**：空 UA、curl、wget、python、Go、Java 等爬虫特征 UA，返回 403
+4. **自定义封禁 UA**：管理员在后台手动添加的 UA 关键词，返回 403
+5. **速率限制**：每分钟20次，burst 5，超出返回 429
+6. **白名单**：白名单 IP 跳过所有拦截，直接放行
+
+云厂商 IP 库每周自动更新，更新日志见 `/var/log/subscribe/update_cloud_geo.log`。
+
+---
+
+## 常用命令
+
+```bash
+# 查看实时日志
+docker logs -f subscribe-gateway
+docker logs -f subscribe-admin
+
+# 重启服务
+docker compose restart
+
+# 完整重建
+docker compose up -d --build
+
+# 进入 gateway 容器调试
+docker exec -it subscribe-gateway sh
+```
