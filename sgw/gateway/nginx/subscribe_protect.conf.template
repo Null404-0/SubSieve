@@ -5,6 +5,7 @@ location ^~ ${SUBSCRIBE_PATH} {
     if ($is_cloud_ip = 1)       { set $block_reason "cloud"; }
     if ($bad_subscribe_ua = 1)  { set $block_reason "ua"; }
     if ($is_custom_bad_ua = 1)  { set $block_reason "ua"; }
+    if ($is_ua_whitelisted = 1) { set $block_reason ""; }
 
     if ($whitelist_ip = 1) { set $block_reason ""; }
 

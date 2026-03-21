@@ -70,17 +70,17 @@ if (file_exists(LOG_FILE)) {
     }
 }
 
-// Top 10 IP（今日）
+// Top IP（今日，最多返回500条，前端负责显示限制）
 uasort($ips, fn($a,$b) => $b['total'] - $a['total']);
 $topIps = [];
-foreach (array_slice($ips, 0, 10, true) as $ip => $v) {
+foreach (array_slice($ips, 0, 500, true) as $ip => $v) {
     $topIps[] = array_merge(['ip' => $ip], $v);
 }
 
-// Top 10 Token（今日）
+// Top Token（今日，最多返回500条，前端负责显示限制）
 uasort($tokens, fn($a,$b) => $b['count'] - $a['count']);
 $topTokens = [];
-foreach (array_slice($tokens, 0, 10, true) as $tok => $v) {
+foreach (array_slice($tokens, 0, 500, true) as $tok => $v) {
     $topTokens[] = [
         'token'      => substr($tok, 0, 8) . '…',
         'token_full' => $tok,
@@ -89,10 +89,10 @@ foreach (array_slice($tokens, 0, 10, true) as $tok => $v) {
     ];
 }
 
-// 可疑 UA
+// UA TOP（最多返回500条，前端负责显示限制）
 arsort($badUas);
 $badUaList = [];
-foreach (array_slice($badUas, 0, 20, true) as $ua => $cnt) {
+foreach (array_slice($badUas, 0, 500, true) as $ua => $cnt) {
     $badUaList[] = ['ua' => $ua, 'count' => $cnt];
 }
 
