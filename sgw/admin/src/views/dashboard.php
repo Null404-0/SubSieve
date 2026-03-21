@@ -152,7 +152,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
     <span class="nav-icon">📊</span>分析
   </button>
   <button class="nav-item" onclick="switchTab('ua_blacklist',this)">
-    <span class="nav-icon">🛡</span>封禁UA
+    <span class="nav-icon">🛡</span>UA
   </button>
   <button class="nav-item" onclick="switchTab('whitelist',this)">
     <span class="nav-icon">✅</span>白名单
@@ -200,8 +200,14 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <input class="log-filter" id="filter-token" placeholder="过滤 Token" oninput="renderLogs()">
           <span class="auto-timer" id="log-count">—</span>
           <div class="radio-group">
-            <label><input type="radio" name="sub-filter" value="subscribe" onchange="renderLogs()"> 仅订阅相关</label>
-            <label><input type="radio" name="sub-filter" value="all" checked onchange="renderLogs()"> 显示全部</label>
+            <label><input type="radio" name="sub-filter" value="subscribe" checked onchange="renderLogs()"> 仅订阅相关</label>
+            <label><input type="radio" name="sub-filter" value="all" onchange="renderLogs()"> 显示全部</label>
+          </div>
+          <div style="display:flex;gap:4px;margin-left:8px">
+            <button class="mode-btn" id="limit-btn-50"  onclick="setLogLimit(50)">50条</button>
+            <button class="mode-btn active" id="limit-btn-100" onclick="setLogLimit(100)">100条</button>
+            <button class="mode-btn" id="limit-btn-500" onclick="setLogLimit(500)">500条</button>
+            <button class="mode-btn" id="limit-btn-inf" onclick="setLogLimit(0)">瀑布流</button>
           </div>
         </div>
         <div class="log-table-wrap">
@@ -222,29 +228,69 @@ tr:hover td{background:rgba(99,102,241,.04)}
     <div class="tab-panel" id="panel-stats">
       <div class="stats-grid">
         <div class="card">
-          <div class="card-title">今日 Top IP</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">今日 Top IP</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-ips-10" onclick="setStatsLimit('ips',10)">10</button>
+              <button class="mode-btn" id="stats-ips-25" onclick="setStatsLimit('ips',25)">25</button>
+              <button class="mode-btn" id="stats-ips-50" onclick="setStatsLimit('ips',50)">50</button>
+              <button class="mode-btn" id="stats-ips-0" onclick="setStatsLimit('ips',0)">全部</button>
+            </div>
+          </div>
           <div id="top-ips"><div class="loading">加载中…</div></div>
         </div>
         <div class="card">
-          <div class="card-title">今日 Top Token</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">今日 Top Token</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-tokens-10" onclick="setStatsLimit('tokens',10)">10</button>
+              <button class="mode-btn" id="stats-tokens-25" onclick="setStatsLimit('tokens',25)">25</button>
+              <button class="mode-btn" id="stats-tokens-50" onclick="setStatsLimit('tokens',50)">50</button>
+              <button class="mode-btn" id="stats-tokens-0" onclick="setStatsLimit('tokens',0)">全部</button>
+            </div>
+          </div>
           <div id="top-tokens"><div class="loading">加载中…</div></div>
         </div>
         <div class="card">
-          <div class="card-title">可疑 Token（被多IP拉取）</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">可疑 Token（被多IP拉取）</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-suspTokens-10" onclick="setStatsLimit('suspTokens',10)">10</button>
+              <button class="mode-btn" id="stats-suspTokens-25" onclick="setStatsLimit('suspTokens',25)">25</button>
+              <button class="mode-btn" id="stats-suspTokens-50" onclick="setStatsLimit('suspTokens',50)">50</button>
+              <button class="mode-btn" id="stats-suspTokens-0" onclick="setStatsLimit('suspTokens',0)">全部</button>
+            </div>
+          </div>
           <div id="susp-tokens"><div class="loading">加载中…</div></div>
         </div>
         <div class="card">
-          <div class="card-title">可疑 IP（拉取多Token）</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">可疑 IP（拉取多Token）</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-suspIps-10" onclick="setStatsLimit('suspIps',10)">10</button>
+              <button class="mode-btn" id="stats-suspIps-25" onclick="setStatsLimit('suspIps',25)">25</button>
+              <button class="mode-btn" id="stats-suspIps-50" onclick="setStatsLimit('suspIps',50)">50</button>
+              <button class="mode-btn" id="stats-suspIps-0" onclick="setStatsLimit('suspIps',0)">全部</button>
+            </div>
+          </div>
           <div id="susp-ips"><div class="loading">加载中…</div></div>
         </div>
-        <div class="card" style="grid-column:1/-1">
-          <div class="card-title">可疑 UA（触发403）</div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="card-title" style="margin-bottom:0">UA TOP</div>
+            <div style="display:flex;gap:4px">
+              <button class="mode-btn active" id="stats-uas-10" onclick="setStatsLimit('uas',10)">10</button>
+              <button class="mode-btn" id="stats-uas-25" onclick="setStatsLimit('uas',25)">25</button>
+              <button class="mode-btn" id="stats-uas-50" onclick="setStatsLimit('uas',50)">50</button>
+              <button class="mode-btn" id="stats-uas-0" onclick="setStatsLimit('uas',0)">全部</button>
+            </div>
+          </div>
           <div id="bad-uas"><div class="loading">加载中…</div></div>
         </div>
       </div>
     </div>
 
-    <!-- ─── 封禁UA ─────────────────────────────────────────── -->
+    <!-- ─── UA ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-ua_blacklist">
       <div class="card">
         <div class="card-title">添加封禁 UA</div>
@@ -256,7 +302,33 @@ tr:hover td{background:rgba(99,102,241,.04)}
         <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
           ⚡ 封禁 UA 后立即 reload nginx 生效，大小写不敏感，支持关键词匹配
         </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:10px">
+          <span style="color:var(--text3);font-size:12px">显示：</span>
+          <button class="mode-btn active" id="ua-bl-limit-50" onclick="setUaBlLimit(50)">50条</button>
+          <button class="mode-btn" id="ua-bl-limit-100" onclick="setUaBlLimit(100)">100条</button>
+          <button class="mode-btn" id="ua-bl-limit-500" onclick="setUaBlLimit(500)">500条</button>
+          <button class="mode-btn" id="ua-bl-limit-0" onclick="setUaBlLimit(0)">全部</button>
+        </div>
         <div id="ua-list"><div class="loading">加载中…</div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">UA 白名单</div>
+        <div class="apply-hint" style="margin-bottom:14px;color:#22c55e">
+          ✅ 白名单UA不受封禁UA规则影响，可保护自己的客户端UA不被误封
+        </div>
+        <div class="ip-form">
+          <input class="ip-input" id="ua-wl-keyword" placeholder="UA 关键词（如 Surge、Clash.Meta）">
+          <input class="comment-input" id="ua-wl-comment" placeholder="备注（可选）">
+          <button class="btn-primary" onclick="uaWlAdd()">添加并立即生效</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:10px">
+          <span style="color:var(--text3);font-size:12px">显示：</span>
+          <button class="mode-btn active" id="ua-wl-limit-50" onclick="setUaWlLimit(50)">50条</button>
+          <button class="mode-btn" id="ua-wl-limit-100" onclick="setUaWlLimit(100)">100条</button>
+          <button class="mode-btn" id="ua-wl-limit-500" onclick="setUaWlLimit(500)">500条</button>
+          <button class="mode-btn" id="ua-wl-limit-0" onclick="setUaWlLimit(0)">全部</button>
+        </div>
+        <div id="ua-wl-list"><div class="loading">加载中…</div></div>
       </div>
     </div>
 
@@ -303,7 +375,15 @@ tr:hover td{background:rgba(99,102,241,.04)}
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
+let logLimit = 100;      // 0=瀑布流（无限制）
 let blacklistIpSet = new Set();
+let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
+let allStatsData = null; // 完整统计数据缓存
+let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10};
+let uaBlLimit = 50;      // UA封禁列表显示数量
+let uaWlLimit = 50;      // UA白名单显示数量
+let allUaBlEntries = []; // UA封禁列表完整数据缓存
+let allUaWlEntries = []; // UA白名单完整数据缓存
 let autoTimer, countdown = 300;
 
 // ── 主题 ──────────────────────────────────────────────────────
@@ -336,11 +416,11 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
 });
 applyTheme();
 const TABS = {
-  logs:         {title:'日志',     loader:loadLogs},
-  stats:        {title:'分析',     loader:loadStats},
-  ua_blacklist: {title:'封禁UA',   loader:loadUaBlacklist},
-  whitelist:    {title:'白名单',   loader:loadWhitelist},
-  blacklist:    {title:'黑名单',   loader:loadBlacklist},
+  logs:         {title:'日志',   loader:loadLogs},
+  stats:        {title:'分析',   loader:loadStats},
+  ua_blacklist: {title:'UA',     loader:loadUaBlacklist},
+  whitelist:    {title:'白名单', loader:loadWhitelist},
+  blacklist:    {title:'黑名单', loader:loadBlacklist},
 };
 let currentTab = 'logs';
 
@@ -428,15 +508,54 @@ function setLogMode(mode) {
   loadLogs();
 }
 
+// ── 日志显示数量切换 ────────────────────────────────────────────
+function setLogLimit(n) {
+  logLimit = n;
+  ['50','100','500','inf'].forEach(k => {
+    const btn = document.getElementById('limit-btn-' + k);
+    if (btn) btn.classList.remove('active');
+  });
+  const key = n === 0 ? 'inf' : String(n);
+  const btn = document.getElementById('limit-btn-' + key);
+  if (btn) btn.classList.add('active');
+  renderLogs();
+}
+
+
+// ── 云IP检测辅助函数 ───────────────────────────────────────────
+function ipToInt(ip) {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  return parts.reduce((acc, p) => (acc * 256 + parseInt(p, 10)), 0);
+}
+
+function ipInCidr(ipInt, cidr) {
+  const slash = cidr.indexOf('/');
+  const base = slash >= 0 ? cidr.slice(0, slash) : cidr;
+  const bits = slash >= 0 ? parseInt(cidr.slice(slash + 1)) : 32;
+  const baseParts = base.split('.');
+  if (baseParts.length !== 4) return false;
+  const baseInt = baseParts.reduce((acc, p) => (acc * 256 + parseInt(p, 10)), 0);
+  const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits)) >>> 0;
+  return ((ipInt >>> 0) & mask) === ((baseInt >>> 0) & mask);
+}
+
+function isCloudIp(ip) {
+  const ipInt = ipToInt(ip);
+  if (ipInt === null) return false;
+  return cloudCidrs.some(cidr => ipInCidr(ipInt, cidr));
+}
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
   document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
-  const [logsData, blData] = await Promise.all([
+  const [logsData, blData, cloudData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
     apiFetch('/api/blacklist.php?no_idc=1'),
+    apiFetch('/api/blacklist.php?cloud_cidrs=1'),
   ]);
   blacklistIpSet = new Set((blData.entries || []).map(e => e.ip));
+  cloudCidrs = cloudData.cidrs || [];
   if (!logsData.ok) {
     document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
@@ -460,22 +579,29 @@ function renderLogs() {
   });
 
   const total = rows.length;
-  document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
 
   // 最新的在最上面
   rows = rows.slice().reverse();
 
-  if (!rows.length) {
+  // 应用显示数量限制（0=瀑布流，无限制）
+  const displayRows = logLimit > 0 ? rows.slice(0, logLimit) : rows;
+  const limitHint = logLimit > 0 && rows.length > logLimit ? `（显示前${logLimit}条）` : '';
+  document.getElementById('log-count').textContent = `${displayRows.length} / ${allLogs.length} 条${limitHint}`;
+
+  if (!displayRows.length) {
     document.getElementById('log-tbody').innerHTML =
       '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
     return;
   }
 
-  document.getElementById('log-tbody').innerHTML = rows.map(l => {
+  document.getElementById('log-tbody').innerHTML = displayRows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
+    const isCloud = !isBlacklisted && isCloudIp(l.ip);
     const ipBtn = isBlacklisted
       ? `<button class="bl-badge-btn" onclick="quickWhitelist('${esc(l.ip)}')">黑名单</button>`
-      : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
+      : isCloud
+        ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
+        : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
     const tokenHtml = l.token
       ? `<div class="token-cell"><span class="token-text" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
@@ -531,9 +657,28 @@ async function loadStats() {
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
   }
+  allStatsData = data;
+  renderStats();
+}
+
+function setStatsLimit(key, n) {
+  statsLimits[key] = n;
+  // 更新按钮样式
+  const map = {ips:'ips', tokens:'tokens', uas:'uas', suspTokens:'suspTokens', suspIps:'suspIps'};
+  [10, 25, 50, 0].forEach(v => {
+    const btn = document.getElementById(`stats-${key}-${v}`);
+    if (btn) btn.classList.toggle('active', v === n);
+  });
+  renderStats();
+}
+
+function renderStats() {
+  if (!allStatsData) return;
+  const data = allStatsData;
 
   // Top IP
-  const ipHtml = (data.top_ips||[]).length ? (data.top_ips||[]).map((r,i) => `
+  const ips = statsLimits.ips > 0 ? (data.top_ips||[]).slice(0, statsLimits.ips) : (data.top_ips||[]);
+  document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => `
     <div class="top-row">
       <span class="top-rank">${i+1}</span>
       <span class="top-val">
@@ -547,10 +692,10 @@ async function loadStats() {
         <span style="color:#eab308">${r.s429}</span>
       </span>
     </div>`).join('') : '<div class="empty">暂无数据</div>';
-  document.getElementById('top-ips').innerHTML = ipHtml;
 
   // Top Token
-  const tokHtml = (data.top_tokens||[]).length ? (data.top_tokens||[]).map((r,i) => `
+  const toks = statsLimits.tokens > 0 ? (data.top_tokens||[]).slice(0, statsLimits.tokens) : (data.top_tokens||[]);
+  document.getElementById('top-tokens').innerHTML = toks.length ? toks.map((r,i) => `
     <div class="top-row">
       <span class="top-rank">${i+1}</span>
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
@@ -560,22 +705,21 @@ async function loadStats() {
       <span class="top-count" style="white-space:nowrap;margin-left:6px">${r.count}次</span>
       <span class="top-sub" style="margin-left:8px">${esc(r.last_time)}</span>
     </div>`).join('') : '<div class="empty">暂无数据</div>';
-  document.getElementById('top-tokens').innerHTML = tokHtml;
 
-  // 可疑 UA
-  const uaHtml = (data.bad_uas||[]).length ? `
+  // UA TOP
+  const uas = statsLimits.uas > 0 ? (data.bad_uas||[]).slice(0, statsLimits.uas) : (data.bad_uas||[]);
+  document.getElementById('bad-uas').innerHTML = uas.length ? `
     <table><thead><tr><th>UA</th><th>403次数</th><th>操作</th></tr></thead>
-    <tbody>${(data.bad_uas||[]).map(r => `
+    <tbody>${uas.map(r => `
       <tr>
-        <td class="ua-cell" style="max-width:500px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
+        <td class="ua-cell" style="max-width:400px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
         <td style="color:#ef4444;font-weight:600">${r.count}</td>
         <td><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
       </tr>`).join('')}
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
-  document.getElementById('bad-uas').innerHTML = uaHtml;
 
   // 可疑 Token
-  const suspToks = data.susp_tokens || [];
+  const suspToks = statsLimits.suspTokens > 0 ? (data.susp_tokens||[]).slice(0, statsLimits.suspTokens) : (data.susp_tokens||[]);
   document.getElementById('susp-tokens').innerHTML = suspToks.length ? suspToks.map(r => `
     <div class="top-row">
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
@@ -586,25 +730,77 @@ async function loadStats() {
     </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
 
   // 可疑 IP
-  const suspIps = data.susp_ips || [];
+  const suspIps = statsLimits.suspIps > 0 ? (data.susp_ips||[]).slice(0, statsLimits.suspIps) : (data.susp_ips||[]);
   document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => `
     <div class="top-row">
       <span class="top-val">${esc(r.ip)}
         <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
+        <button class="add-btn-sm" style="background:#22c55e;margin-left:4px" onclick="quickWhitelistIp('${esc(r.ip)}')">白</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token</span>
     </div>`).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
 }
 
-// ── 封禁UA ─────────────────────────────────────────────────────
-async function loadUaBlacklist() {
-  const data = await apiFetch('/api/ua_blacklist.php');
-  if (!data.ok) {
-    document.getElementById('ua-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
-    toast('加载失败: ' + (data.error||''), 'err'); return;
+// ── 从分析页加入白名单（不要求先在黑名单）──────────────────────
+async function quickWhitelistIp(ip) {
+  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
+  const d = await apiFetch('/api/whitelist.php', {
+    method: 'POST', body: JSON.stringify({ip, comment: '从分析页加入白名单'}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok || (d.error && d.error.includes('已在白名单'))) {
+    toast(`✅ ${ip} 已加入白名单`);
+  } else {
+    toast(d.error || '加入白名单失败', 'err');
   }
-  const entries = data.entries || [];
-  if (!entries.length) {
+}
+
+// ── UA 管理 ─────────────────────────────────────────────────────
+async function loadUaBlacklist() {
+  const [blData, wlData] = await Promise.all([
+    apiFetch('/api/ua_blacklist.php'),
+    apiFetch('/api/ua_whitelist.php'),
+  ]);
+  if (!blData.ok) {
+    document.getElementById('ua-list').innerHTML = '<div class="empty">加载失败：' + esc(blData.error||'未知错误') + '</div>';
+    toast('加载失败: ' + (blData.error||''), 'err');
+  } else {
+    allUaBlEntries = blData.entries || [];
+    renderUaBlacklist();
+  }
+  if (!wlData.ok) {
+    document.getElementById('ua-wl-list').innerHTML = '<div class="empty">加载失败：' + esc(wlData.error||'未知错误') + '</div>';
+  } else {
+    allUaWlEntries = wlData.entries || [];
+    renderUaWhitelist();
+  }
+}
+
+function setUaBlLimit(n) {
+  uaBlLimit = n;
+  ['50','100','500','0'].forEach(k => {
+    const btn = document.getElementById('ua-bl-limit-' + k);
+    if (btn) btn.classList.remove('active');
+  });
+  const btn = document.getElementById('ua-bl-limit-' + n);
+  if (btn) btn.classList.add('active');
+  renderUaBlacklist();
+}
+
+function setUaWlLimit(n) {
+  uaWlLimit = n;
+  ['50','100','500','0'].forEach(k => {
+    const btn = document.getElementById('ua-wl-limit-' + k);
+    if (btn) btn.classList.remove('active');
+  });
+  const btn = document.getElementById('ua-wl-limit-' + n);
+  if (btn) btn.classList.add('active');
+  renderUaWhitelist();
+}
+
+function renderUaBlacklist() {
+  const entries = uaBlLimit > 0 ? allUaBlEntries.slice(0, uaBlLimit) : allUaBlEntries;
+  if (!allUaBlEntries.length) {
     document.getElementById('ua-list').innerHTML = '<div class="empty">封禁列表为空</div>';
     return;
   }
@@ -616,6 +812,24 @@ async function loadUaBlacklist() {
         <td style="color:#64748b">${esc(e.comment)||'—'}</td>
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="uaDel('${esc(e.ua)}')">移除</button></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderUaWhitelist() {
+  const entries = uaWlLimit > 0 ? allUaWlEntries.slice(0, uaWlLimit) : allUaWlEntries;
+  if (!allUaWlEntries.length) {
+    document.getElementById('ua-wl-list').innerHTML = '<div class="empty">白名单为空</div>';
+    return;
+  }
+  document.getElementById('ua-wl-list').innerHTML = `
+    <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
+    <tbody>${entries.map(e => `
+      <tr>
+        <td class="ip-cell">${esc(e.ua)}</td>
+        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
+        <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
+        <td><button class="btn-danger" onclick="uaWlDel('${esc(e.ua)}')">移除</button></td>
       </tr>`).join('')}
     </tbody></table>`;
 }
@@ -656,6 +870,34 @@ async function quickBanUA(ua) {
   });
   if (d.ok) toast(`✅ UA 已封禁`);
   else toast(d.error||'封禁失败','err');
+}
+
+// ── UA 白名单 ──────────────────────────────────────────────────
+async function uaWlAdd() {
+  const ua  = document.getElementById('ua-wl-keyword').value.trim();
+  const cmt = document.getElementById('ua-wl-comment').value.trim();
+  if (!ua) { toast('请输入 UA 关键词','err'); return; }
+  const d = await apiFetch('/api/ua_whitelist.php', {
+    method:'POST', body:JSON.stringify({ua, comment:cmt}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    document.getElementById('ua-wl-keyword').value = '';
+    document.getElementById('ua-wl-comment').value = '';
+    toast('✅ UA 已加入白名单并立即生效');
+    loadUaBlacklist();
+  } else {
+    toast(d.error||'添加失败','err');
+  }
+}
+
+async function uaWlDel(ua) {
+  const d = await apiFetch('/api/ua_whitelist.php', {
+    method:'DELETE', body:JSON.stringify({ua}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) { toast('✅ 已从白名单移除并立即生效'); loadUaBlacklist(); }
+  else toast(d.error||'移除失败','err');
 }
 
 // ── 白名单 ────────────────────────────────────────────────────

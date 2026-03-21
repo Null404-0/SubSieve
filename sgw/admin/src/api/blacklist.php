@@ -3,8 +3,13 @@ require_once __DIR__ . '/_auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// GET — 列出黑名单（?no_idc=1 可跳过IDC概要，供日志页仅需IP集合时使用）
+// GET — 列出黑名单
+// ?no_idc=1     跳过IDC概要（日志页仅需IP集合时使用）
+// ?cloud_cidrs=1 仅返回云服务商CIDR列表（供前端云IP检测使用）
 if ($method === 'GET') {
+    if (!empty($_GET['cloud_cidrs'])) {
+        json_out(['ok' => true, 'cidrs' => read_cloud_cidrs()]);
+    }
     $idc = empty($_GET['no_idc']) ? read_idc_summary() : [];
     json_out(['ok' => true, 'entries' => read_blacklist(), 'idc_summary' => $idc]);
 }
@@ -81,6 +86,20 @@ function write_blacklist(array $entries): bool {
     $r2 = file_put_contents(BLACKLIST_CONF, implode("\n", $lines) . "\n", LOCK_EX);
 
     return $r1 !== false && $r2 !== false;
+}
+
+// ── 读取 cloud_geo.conf 返回所有CIDR列表（供前端IP范围匹配）──────
+
+function read_cloud_cidrs(): array {
+    if (!file_exists(CLOUD_GEO_CONF)) return [];
+    $cidrs = [];
+    foreach (file(CLOUD_GEO_CONF, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if (preg_match('/^(\d[\d\.\/]+) 1;$/', $line, $m)) {
+            $cidrs[] = $m[1];
+        }
+    }
+    return $cidrs;
 }
 
 // ── 读取 cloud_geo.conf 返回各IDC汇总 ──────────────────────────

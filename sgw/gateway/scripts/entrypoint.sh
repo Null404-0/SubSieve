@@ -41,6 +41,18 @@ fi
 [[ ! -f /etc/nginx/subscribe/ua_blacklist.json ]] && echo "[]" > /etc/nginx/subscribe/ua_blacklist.json
 chmod 666 /etc/nginx/subscribe/ua_custom.conf /etc/nginx/subscribe/ua_blacklist.json
 
+# 初始化UA白名单
+if [[ ! -f /etc/nginx/subscribe/ua_whitelist.conf ]]; then
+    cat > /etc/nginx/subscribe/ua_whitelist.conf <<'UAWEOF'
+# UA白名单 - 由 admin 自动生成
+map $http_user_agent $is_ua_whitelisted {
+    default 0;
+}
+UAWEOF
+fi
+[[ ! -f /etc/nginx/subscribe/ua_whitelist.json ]] && echo "[]" > /etc/nginx/subscribe/ua_whitelist.json
+chmod 666 /etc/nginx/subscribe/ua_whitelist.conf /etc/nginx/subscribe/ua_whitelist.json
+
 # 首次拉取云IP库
 if [[ ! -f /etc/nginx/subscribe/cloud_geo.conf ]]; then
     log "首次启动：拉取云厂商IP库..."

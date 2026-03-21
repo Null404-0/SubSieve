@@ -59,11 +59,21 @@ function write_ua_blacklist(array $entries): bool {
     // 写 JSON（含元数据）
     $r1 = file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
+    // 读取UA白名单，生成conf时跳过白名单中的UA
+    $whitelist = [];
+    if (file_exists(UA_WHITELIST_JSON)) {
+        $wl = json_decode(file_get_contents(UA_WHITELIST_JSON), true);
+        if (is_array($wl)) {
+            $whitelist = array_column($wl, 'ua');
+        }
+    }
+
     // 生成 nginx map conf
     $lines   = ['# 自定义封禁UA - 由 admin 自动生成 | ' . date('Y-m-d H:i:s')];
     $lines[] = 'map $http_user_agent $is_custom_bad_ua {';
     $lines[] = '    default 0;';
     foreach ($entries as $e) {
+        if (in_array($e['ua'], $whitelist, true)) continue; // 白名单中的UA不生效
         // 转义正则特殊字符（nginx 使用 PCRE）
         $pattern = str_replace(['\\', '"', '~'], ['\\\\', '\\"', '\\~'], $e['ua']);
         $cmt     = $e['comment'] ? " # {$e['comment']}" : '';
