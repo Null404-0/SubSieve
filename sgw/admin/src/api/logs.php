@@ -10,6 +10,7 @@ if ($method === 'GET' && !empty($_GET['export'])) {
         echo '';
         exit;
     }
+    clearstatcache(true, LOG_FILE);
     $filename = 'access-' . date('Ymd-His') . '.log';
     header('Content-Type: text/plain; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -18,43 +19,88 @@ if ($method === 'GET' && !empty($_GET['export'])) {
     exit;
 }
 
-// ── 导入 — 接收 nginx 日志文本，转换格式后合并 ────────────────
+// ── 导入 — multipart 文件上传，流式合并到现有日志 ──────────────
 if ($method === 'POST') {
-    $body = json_decode(file_get_contents('php://input'), true);
-    $raw  = trim($body['content'] ?? '');
-    if ($raw === '') json_err('内容为空');
+    // 检测 multipart 上传
+    if (!isset($_FILES['log'])) {
+        json_err('请通过文件上传方式导入日志');
+    }
 
-    $lines = explode("\n", str_replace("\r\n", "\n", $raw));
+    $uploadErr = $_FILES['log']['error'];
+    if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
+        json_err('文件超过服务器上传限制（upload_max_filesize: '
+            . ini_get('upload_max_filesize') . '），请拆分后分批导入');
+    }
+    if ($uploadErr !== UPLOAD_ERR_OK) {
+        json_err('文件上传失败（PHP 错误码 ' . $uploadErr . '）');
+    }
+
+    // ── 1. 流式读取并转换上传的日志文件（仅新行占内存）──────────
+    $newLines = [];
     $imported = 0;
-    $newLines  = [];
-
-    foreach ($lines as $line) {
+    $fh = fopen($_FILES['log']['tmp_name'], 'r');
+    if (!$fh) json_err('无法读取上传文件');
+    while (($line = fgets($fh)) !== false) {
         $line = trim($line);
         if ($line === '') continue;
         $internal = nginx_combined_to_internal($line);
-        if ($internal === null) continue;      // 无法解析，跳过
+        if ($internal === null) continue;
         $newLines[] = $internal;
         $imported++;
     }
+    fclose($fh);
 
     if (!$imported) json_err('未能解析任何有效日志行，请确认为标准 nginx 日志格式');
 
-    // 读取现有日志，合并、去重、按时间排序
-    $existing = [];
-    if (file_exists(LOG_FILE)) {
-        $existing = file(LOG_FILE, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    }
-    $merged  = array_unique(array_merge($existing, $newLines));
-    $mergedT = [];
-    foreach ($merged as $l) {
-        $ts = extract_timestamp($l);
-        $mergedT[] = [$ts, $l];
-    }
-    usort($mergedT, fn($a,$b) => $a[0] <=> $b[0]);
-    $sorted = array_map(fn($r) => $r[1], $mergedT);
+    // ── 2. 对新行去重、按时间排序 ────────────────────────────────
+    $newLines = array_values(array_unique($newLines));
+    usort($newLines, fn($a, $b) => extract_timestamp($a) <=> extract_timestamp($b));
+    $nc = count($newLines);
+    $ni = 0;
 
-    file_put_contents(LOG_FILE, implode("\n", $sorted) . "\n", LOCK_EX);
-    json_out(['ok' => true, 'imported' => $imported, 'total' => count($sorted)]);
+    // ── 3. 流式归并现有日志文件（O(1) 内存，支持超大文件）────────
+    $tmpOut  = LOG_FILE . '.import.tmp';
+    $outFh   = fopen($tmpOut, 'w');
+    if (!$outFh) json_err('无法写入临时文件，请检查磁盘权限');
+
+    $existFh  = file_exists(LOG_FILE) ? fopen(LOG_FILE, 'r') : null;
+    $existBuf = null;   // 当前从现有文件读取的行
+    $lastWritten = null;
+    $total = 0;
+
+    // 读取现有文件的下一行（跳过空行）
+    $readExist = function() use ($existFh, &$existBuf) {
+        if (!$existFh) { $existBuf = null; return; }
+        while (($l = fgets($existFh)) !== false) {
+            $l = trim($l);
+            if ($l !== '') { $existBuf = $l; return; }
+        }
+        $existBuf = null;
+    };
+    $readExist();   // 初始化第一行
+
+    while ($ni < $nc || $existBuf !== null) {
+        $newTs   = ($ni < $nc)         ? extract_timestamp($newLines[$ni]) : PHP_INT_MAX;
+        $existTs = ($existBuf !== null) ? extract_timestamp($existBuf)     : PHP_INT_MAX;
+
+        if ($newTs <= $existTs) {
+            $toWrite = $newLines[$ni++];
+        } else {
+            $toWrite = $existBuf;
+            $readExist();
+        }
+
+        if ($toWrite === $lastWritten) continue;   // 去重
+        $lastWritten = $toWrite;
+        fwrite($outFh, $toWrite . "\n");
+        $total++;
+    }
+
+    if ($existFh) fclose($existFh);
+    fclose($outFh);
+    rename($tmpOut, LOG_FILE);
+
+    json_out(['ok' => true, 'imported' => $imported, 'total' => $total]);
 }
 
 // ── DELETE — 删除7天前的日志行 ──────────────────────────────

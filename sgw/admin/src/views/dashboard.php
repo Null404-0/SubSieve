@@ -849,24 +849,29 @@ function exportLogs() {
   a.click();
 }
 
-// ── 导入日志 ──────────────────────────────────────────────────
+// ── 导入日志（multipart 上传，绕过 post_max_size 限制）──────────
 async function importLogs(input) {
   const file = input.files[0];
   if (!file) return;
-  input.value = '';  // 重置，允许再次选同一文件
-  const content = await file.text();
-  if (!content.trim()) { toast('文件内容为空', 'err'); return; }
+  input.value = '';   // 重置，允许再次选同一文件
   toast('导入中…');
-  const d = await apiFetch('/api/logs.php', {
-    method: 'POST',
-    body: JSON.stringify({content}),
-    headers: {'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) {
-    toast(`✅ 导入成功：新增 ${d.imported} 行，共 ${d.total} 行`);
-    loadLogs();
-  } else {
-    toast(d.error || '导入失败', 'err');
+  try {
+    const fd = new FormData();
+    fd.append('log', file);
+    const r = await fetch(BASE + '/api/logs.php', {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: fd,
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`✅ 导入成功：新增 ${d.imported} 行，共 ${d.total} 行`);
+      loadLogs();
+    } else {
+      toast(d.error || '导入失败', 'err');
+    }
+  } catch(e) {
+    toast('导入失败：网络错误', 'err');
   }
 }
 
