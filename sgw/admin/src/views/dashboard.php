@@ -408,7 +408,7 @@ async function loadLogs() {
   document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
   const [logsData, blData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
-    apiFetch('/api/blacklist.php'),
+    apiFetch('/api/blacklist.php?no_idc=1'),
   ]);
   blacklistIpSet = new Set((blData.entries || []).map(e => e.ip));
   if (!logsData.ok) {
@@ -493,21 +493,24 @@ async function deleteLogs() {
 // ── 从日志加入白名单 ───────────────────────────────────────────
 async function quickWhitelist(ip) {
   if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
-  const [d1, d2] = await Promise.all([
-    apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
-      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}}),
-    apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
-      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}}),
-  ]);
-  if (d1.ok && d2.ok) { toast(`✅ ${ip} 已加入白名单`); loadLogs(); }
-  else toast((d1.error || d2.error) || '操作失败', 'err');
+  const d1 = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  if (!d1.ok) { toast(d1.error || '解封失败', 'err'); return; }
+  const d2 = await apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  // 若IP已在白名单则视为成功（目的已达到）
+  if (d2.ok || (d2.error && d2.error.includes('已在白名单'))) {
+    toast(`✅ ${ip} 已加入白名单`); loadLogs();
+  } else {
+    toast(d2.error || '加入白名单失败', 'err');
+  }
 }
 
 // ── 分析 ──────────────────────────────────────────────────────
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
   if (!data.ok) {
-    ['top-ips','top-tokens','bad-uas'].forEach(id => {
+    ['top-ips','top-tokens','bad-uas','susp-tokens','susp-ips'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
@@ -536,7 +539,7 @@ async function loadStats() {
       <span class="top-rank">${i+1}</span>
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
         <span class="token-text" title="${esc(r.token_full)}">${esc(r.token_full)}</span>
-        <button class="copy-btn" onclick="copyText('${esc(r.token_full)}')">复制</button>
+        <button class="copy-btn" data-val="${esc(r.token_full)}" onclick="copyText(this.dataset.val)">复制</button>
       </span>
       <span class="top-count" style="white-space:nowrap;margin-left:6px">${r.count}次</span>
       <span class="top-sub" style="margin-left:8px">${esc(r.last_time)}</span>

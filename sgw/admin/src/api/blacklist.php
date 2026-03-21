@@ -3,9 +3,10 @@ require_once __DIR__ . '/_auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// GET — 列出黑名单 + IDC概要
+// GET — 列出黑名单（?no_idc=1 可跳过IDC概要，供日志页仅需IP集合时使用）
 if ($method === 'GET') {
-    json_out(['ok' => true, 'entries' => read_blacklist(), 'idc_summary' => read_idc_summary()]);
+    $idc = empty($_GET['no_idc']) ? read_idc_summary() : [];
+    json_out(['ok' => true, 'entries' => read_blacklist(), 'idc_summary' => $idc]);
 }
 
 // POST — 添加并立即生效
