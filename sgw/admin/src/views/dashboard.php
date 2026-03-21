@@ -195,13 +195,13 @@ tr:hover td{background:rgba(99,102,241,.04)}
         </div>
         <!-- 过滤器 -->
         <div class="log-controls">
-          <input class="log-filter" id="filter-ip" placeholder="过滤 IP" oninput="renderLogs()">
-          <input class="log-filter" id="filter-status" placeholder="状态码 如 403" oninput="renderLogs()">
-          <input class="log-filter" id="filter-token" placeholder="过滤 Token" oninput="renderLogs()">
+          <input class="log-filter" id="filter-ip" placeholder="过滤 IP" oninput="logPage=1;renderLogs()">
+          <input class="log-filter" id="filter-status" placeholder="状态码 如 403" oninput="logPage=1;renderLogs()">
+          <input class="log-filter" id="filter-token" placeholder="过滤 Token（自动去重）" oninput="logPage=1;renderLogs()">
           <span class="auto-timer" id="log-count">—</span>
           <div class="radio-group">
-            <label><input type="radio" name="sub-filter" value="subscribe" checked onchange="renderLogs()"> 仅订阅相关</label>
-            <label><input type="radio" name="sub-filter" value="all" onchange="renderLogs()"> 显示全部</label>
+            <label><input type="radio" name="sub-filter" value="subscribe" checked onchange="logPage=1;renderLogs()"> 仅订阅相关</label>
+            <label><input type="radio" name="sub-filter" value="all" onchange="logPage=1;renderLogs()"> 显示全部</label>
           </div>
           <div style="display:flex;gap:4px;margin-left:8px">
             <button class="mode-btn" id="limit-btn-50"  onclick="setLogLimit(50)">50条</button>
@@ -221,8 +221,15 @@ tr:hover td{background:rgba(99,102,241,.04)}
             <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
           </table>
         </div>
-      </div>
-    </div>
+        <!-- 分页控件（瀑布流模式下隐藏） -->
+        <div id="log-pagination" class="page-controls" style="display:none;margin-top:10px;align-items:center;gap:8px;flex-wrap:wrap">
+          <button class="mode-btn" id="page-prev" onclick="changePage(-1)">上一页</button>
+          <span id="page-info" style="color:var(--text2);font-size:12px;white-space:nowrap"></span>
+          <button class="mode-btn" id="page-next" onclick="changePage(1)">下一页</button>
+          <span style="color:var(--text3);font-size:12px;margin-left:8px">跳至</span>
+          <input id="page-jump" type="number" min="1" style="width:52px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:4px 6px;border-radius:6px;font-size:12px;outline:none" onkeydown="if(event.key==='Enter')jumpPage()">
+          <button class="mode-btn" onclick="jumpPage()">页</button>
+        </div>
 
     <!-- ─── 分析 ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-stats">
@@ -376,6 +383,7 @@ const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH 
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
 let logLimit = 100;      // 0=瀑布流（无限制）
+let logPage = 1;         // 当前页（分页模式）
 let blacklistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
@@ -511,6 +519,7 @@ function setLogMode(mode) {
 // ── 日志显示数量切换 ────────────────────────────────────────────
 function setLogLimit(n) {
   logLimit = n;
+  logPage = 1;
   ['50','100','500','inf'].forEach(k => {
     const btn = document.getElementById('limit-btn-' + k);
     if (btn) btn.classList.remove('active');
@@ -519,6 +528,17 @@ function setLogLimit(n) {
   const btn = document.getElementById('limit-btn-' + key);
   if (btn) btn.classList.add('active');
   renderLogs();
+}
+
+// ── 分页控制 ──────────────────────────────────────────────────
+function changePage(delta) {
+  logPage += delta;
+  renderLogs();
+}
+
+function jumpPage() {
+  const v = parseInt(document.getElementById('page-jump').value);
+  if (!isNaN(v) && v >= 1) { logPage = v; renderLogs(); }
 }
 
 
@@ -578,23 +598,57 @@ function renderLogs() {
     return true;
   });
 
-  const total = rows.length;
-
   // 最新的在最上面
   rows = rows.slice().reverse();
 
-  // 应用显示数量限制（0=瀑布流，无限制）
-  const displayRows = logLimit > 0 ? rows.slice(0, logLimit) : rows;
-  const limitHint = logLimit > 0 && rows.length > logLimit ? `（显示前${logLimit}条）` : '';
-  document.getElementById('log-count').textContent = `${displayRows.length} / ${allLogs.length} 条${limitHint}`;
-
-  if (!displayRows.length) {
-    document.getElementById('log-tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
-    return;
+  // Token过滤时按IP去重（每个IP只保留最新一条）
+  if (fToken) {
+    const seen = new Set();
+    rows = rows.filter(l => {
+      if (seen.has(l.ip)) return false;
+      seen.add(l.ip);
+      return true;
+    });
   }
 
-  document.getElementById('log-tbody').innerHTML = displayRows.map(l => {
+  const total = rows.length;
+
+  // ── 分页 ──────────────────────────────────────────────────────
+  const pg = document.getElementById('log-pagination');
+  if (logLimit > 0 && total > 0) {
+    const totalPages = Math.ceil(total / logLimit);
+    logPage = Math.max(1, Math.min(logPage, totalPages));
+    const start = (logPage - 1) * logLimit;
+    const displayRows = rows.slice(start, start + logLimit);
+    document.getElementById('log-count').textContent =
+      `${total} 条（第${logPage}/${totalPages}页，每页${logLimit}条）`;
+    document.getElementById('page-info').textContent =
+      `第 ${logPage} / ${totalPages} 页`;
+    document.getElementById('page-prev').disabled = logPage <= 1;
+    document.getElementById('page-next').disabled = logPage >= totalPages;
+    pg.style.display = 'flex';
+
+    if (!displayRows.length) {
+      document.getElementById('log-tbody').innerHTML =
+        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
+      return;
+    }
+    renderLogRows(displayRows);
+  } else {
+    // 瀑布流：显示全部，隐藏分页
+    pg.style.display = 'none';
+    document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
+    if (!total) {
+      document.getElementById('log-tbody').innerHTML =
+        '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
+      return;
+    }
+    renderLogRows(rows);
+  }
+}
+
+function renderLogRows(rows) {
+  document.getElementById('log-tbody').innerHTML = rows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
     const isCloud = !isBlacklisted && isCloudIp(l.ip);
     const ipBtn = isBlacklisted
@@ -603,14 +657,14 @@ function renderLogs() {
         ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
         : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
     const tokenHtml = l.token
-      ? `<div class="token-cell"><span class="token-text" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
+      ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
     return `
     <tr>
       <td style="white-space:nowrap;color:#64748b;font-size:11px">${esc(l.time)}</td>
-      <td class="ip-cell">${esc(l.ip)} ${ipBtn}</td>
+      <td class="ip-cell"><div style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap"><span>${esc(l.ip)}</span><button class="copy-btn" data-val="${esc(l.ip)}" onclick="copyText(this.dataset.val)">复制</button><span style="display:inline-block;width:2px"></span>${ipBtn}</div></td>
       <td>${statusBadge(l.status)}</td>
-      <td style="min-width:120px;max-width:220px">${tokenHtml}</td>
+      <td style="min-width:100px;max-width:200px">${tokenHtml}</td>
       <td><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">复制</button></div></td>
       <td><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">复制</button>` : ''}</div></td>
       <td></td>
@@ -750,6 +804,11 @@ async function quickWhitelistIp(ip) {
   });
   if (d.ok || (d.error && d.error.includes('已在白名单'))) {
     toast(`✅ ${ip} 已加入白名单`);
+    // 从本地缓存移除该IP并立即重绘，无需等待重新拉取数据
+    if (allStatsData) {
+      allStatsData.susp_ips = (allStatsData.susp_ips || []).filter(r => r.ip !== ip);
+      renderStats();
+    }
   } else {
     toast(d.error || '加入白名单失败', 'err');
   }
