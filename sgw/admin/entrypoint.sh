@@ -21,5 +21,11 @@ chmod 666 \
     "$SUBSCRIBE_DIR/ua_custom.conf" \
     "$SUBSCRIBE_DIR/whitelist_ips.txt"
 
+# 确保日志卷目录和日志文件对 PHP-FPM(www-data) 可写
+mkdir -p /var/log/subscribe
+chmod 777 /var/log/subscribe
+touch /var/log/subscribe/access.log
+chmod 666 /var/log/subscribe/access.log
+
 php-fpm -D
 exec nginx -g 'daemon off;'
