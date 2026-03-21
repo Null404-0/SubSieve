@@ -71,9 +71,13 @@ function parse_line(string $line): ?array {
         $token = $tm[1];
     }
 
-    // 时间只取 时:分:秒
-    $timeShort = preg_replace('/^\d+\/\w+\/\d+:/', '', $time);
-    $timeShort = preg_replace('/ \+\d+$/', '', $timeShort);
+    // 时间转换为 YYYY-MM-DD HH:MM:SS
+    $timeShort = preg_replace('/ \+\d+$/', '', $time);
+    if (preg_match('/^(\d{2})\/(\w{3})\/(\d{4}):(\d{2}:\d{2}:\d{2})$/', $timeShort, $dm)) {
+        $months = ['Jan'=>'01','Feb'=>'02','Mar'=>'03','Apr'=>'04','May'=>'05','Jun'=>'06',
+                   'Jul'=>'07','Aug'=>'08','Sep'=>'09','Oct'=>'10','Nov'=>'11','Dec'=>'12'];
+        $timeShort = "{$dm[3]}-" . ($months[$dm[2]] ?? '??') . "-{$dm[1]} {$dm[4]}";
+    }
 
     return [
         'ip'      => $ip,
