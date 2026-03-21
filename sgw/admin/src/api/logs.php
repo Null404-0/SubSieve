@@ -59,9 +59,11 @@ if ($method === 'POST') {
     $ni = 0;
 
     // ── 3. 流式归并现有日志文件（O(1) 内存，支持超大文件）────────
-    $tmpOut  = LOG_FILE . '.import.tmp';
-    $outFh   = fopen($tmpOut, 'w');
-    if (!$outFh) json_err('无法写入临时文件，请检查磁盘权限');
+    // 用系统 /tmp 目录写临时文件，避免 /var/log/subscribe/ 新建文件权限不足
+    $tmpOut = tempnam(sys_get_temp_dir(), 'ss_import_');
+    if ($tmpOut === false) json_err('无法创建临时文件（sys_get_temp_dir 不可写）');
+    $outFh = fopen($tmpOut, 'w');
+    if (!$outFh) { @unlink($tmpOut); json_err('无法打开临时文件进行写入'); }
 
     $existFh  = file_exists(LOG_FILE) ? fopen(LOG_FILE, 'r') : null;
     $existBuf = null;   // 当前从现有文件读取的行
@@ -98,7 +100,15 @@ if ($method === 'POST') {
 
     if ($existFh) fclose($existFh);
     fclose($outFh);
-    rename($tmpOut, LOG_FILE);
+
+    // rename 跨文件系统会失败（/tmp → /var/log），降级为 copy + unlink
+    if (!rename($tmpOut, LOG_FILE)) {
+        if (!copy($tmpOut, LOG_FILE)) {
+            @unlink($tmpOut);
+            json_err('无法更新日志文件，请检查 ' . LOG_FILE . ' 的写入权限');
+        }
+        @unlink($tmpOut);
+    }
 
     json_out(['ok' => true, 'imported' => $imported, 'total' => $total]);
 }
