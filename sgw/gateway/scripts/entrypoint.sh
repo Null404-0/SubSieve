@@ -18,6 +18,7 @@ cp /etc/nginx/templates-src/nginx.conf /etc/nginx/nginx.conf
 
 # 初始化空白名单
 [[ ! -f /etc/nginx/subscribe/whitelist_ips.txt ]] && touch /etc/nginx/subscribe/whitelist_ips.txt
+chmod 666 /etc/nginx/subscribe/whitelist_ips.txt
 
 # 生成白名单 geo 块
 SKIP_NGINX_RELOAD=1 /scripts/reload_whitelist.sh
