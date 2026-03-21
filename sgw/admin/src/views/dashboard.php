@@ -230,6 +230,8 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <input id="page-jump" type="number" min="1" style="width:52px;background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:4px 6px;border-radius:6px;font-size:12px;outline:none" onkeydown="if(event.key==='Enter')jumpPage()">
           <button class="mode-btn" onclick="jumpPage()">页</button>
         </div>
+      </div><!-- .card -->
+    </div><!-- .tab-panel #panel-logs -->
 
     <!-- ─── 分析 ─────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-stats">
