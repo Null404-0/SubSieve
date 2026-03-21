@@ -27,7 +27,7 @@ if ($method === 'POST') {
         'added_at' => date('Y-m-d H:i'),
     ];
 
-    write_ua_blacklist($entries);
+    if (!write_ua_blacklist($entries)) json_err('写入UA封禁文件失败，请检查文件权限');
     $reload = nginx_reload();
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
@@ -40,7 +40,7 @@ if ($method === 'DELETE') {
     if (!$ua) json_err('缺少 ua 参数');
 
     $entries = array_filter(read_ua_blacklist(), fn($e) => $e['ua'] !== $ua);
-    write_ua_blacklist(array_values($entries));
+    if (!write_ua_blacklist(array_values($entries))) json_err('写入UA封禁文件失败，请检查文件权限');
     $reload = nginx_reload();
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
@@ -55,9 +55,9 @@ function read_ua_blacklist(): array {
     return is_array($data) ? $data : [];
 }
 
-function write_ua_blacklist(array $entries): void {
+function write_ua_blacklist(array $entries): bool {
     // 写 JSON（含元数据）
-    file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    $r1 = file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
     // 生成 nginx map conf
     $lines   = ['# 自定义封禁UA - 由 admin 自动生成 | ' . date('Y-m-d H:i:s')];
@@ -71,5 +71,7 @@ function write_ua_blacklist(array $entries): void {
     }
     $lines[] = '}';
 
-    file_put_contents(UA_CUSTOM_CONF, implode("\n", $lines) . "\n", LOCK_EX);
+    $r2 = file_put_contents(UA_CUSTOM_CONF, implode("\n", $lines) . "\n", LOCK_EX);
+
+    return $r1 !== false && $r2 !== false;
 }
