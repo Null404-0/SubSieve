@@ -6,15 +6,27 @@
 <title>SubSieve Admin</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0f1117;color:#e2e8f0;font:14px/1.5 system-ui,sans-serif;display:flex;min-height:100vh}
+:root{
+  --bg:#0f1117;--bg2:#13161f;--bg3:#1a1d2e;--bg-input:#0f1117;
+  --border:#1e2236;--border2:#2d3144;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#6366f1;
+}
+[data-theme="light"]{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#ffffff;--bg-input:#f8fafc;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#1e293b;--text2:#475569;--text3:#94a3b8;
+  --accent:#6366f1;
+}
+body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif;display:flex;min-height:100vh}
 
 /* Sidebar */
-.sidebar{width:200px;background:#13161f;border-right:1px solid #1e2236;flex-shrink:0;display:flex;flex-direction:column;padding:20px 12px}
-.logo{font-size:15px;font-weight:600;color:#e2e8f0;padding:8px 10px 24px}
-.logo span{color:#6366f1}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:#64748b;font-size:13px;transition:all .15s;border:none;background:none;width:100%;text-align:left}
-.nav-item:hover{background:#1e2236;color:#e2e8f0}
-.nav-item.active{background:#1e2236;color:#6366f1}
+.sidebar{width:200px;background:var(--bg2);border-right:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;padding:20px 12px}
+.logo{font-size:15px;font-weight:600;color:var(--text);padding:8px 10px 24px}
+.logo span{color:var(--accent)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--text3);font-size:13px;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--border);color:var(--text)}
+.nav-item.active{background:var(--border);color:var(--accent)}
 .nav-icon{font-size:15px;width:18px;text-align:center}
 .sidebar-bottom{margin-top:auto}
 .logout{color:#ef4444!important}
@@ -22,13 +34,16 @@ body{background:#0f1117;color:#e2e8f0;font:14px/1.5 system-ui,sans-serif;display
 
 /* Main */
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
-.topbar{background:#13161f;border-bottom:1px solid #1e2236;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
 .topbar-title{font-size:15px;font-weight:600}
 .topbar-right{display:flex;align-items:center;gap:12px}
 .status-dot{width:8px;height:8px;background:#22c55e;border-radius:50%;display:inline-block}
-.status-text{color:#64748b;font-size:12px}
-.refresh-btn{background:#1e2236;border:1px solid #2d3144;color:#94a3b8;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .15s}
-.refresh-btn:hover{border-color:#6366f1;color:#6366f1}
+.status-text{color:var(--text3);font-size:12px}
+.refresh-btn{background:var(--border);border:1px solid var(--border2);color:var(--text2);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .15s}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* 主题切换按钮 */
+.theme-btn{background:var(--border);border:1px solid var(--border2);color:var(--text2);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .15s;white-space:nowrap}
+.theme-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Content */
 .content{padding:24px;flex:1;overflow:auto}
@@ -36,42 +51,44 @@ body{background:#0f1117;color:#e2e8f0;font:14px/1.5 system-ui,sans-serif;display
 .tab-panel.active{display:block}
 
 /* Cards */
-.card{background:#1a1d2e;border:1px solid #1e2236;border-radius:10px;padding:20px;margin-bottom:16px}
-.card-title{font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:.5px}
 
 /* Log panel */
 .log-controls{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.log-filter{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:7px 12px;border-radius:7px;font-size:12px;outline:none;width:160px}
-.log-filter:focus{border-color:#6366f1}
+.log-filter{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:7px 12px;border-radius:7px;font-size:12px;outline:none;width:160px}
+.log-filter:focus{border-color:var(--accent)}
 .log-mode-btns{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
-.mode-btn{background:#1e2236;border:1px solid #2d3144;color:#94a3b8;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;transition:all .15s}
-.mode-btn:hover{border-color:#6366f1;color:#6366f1}
-.mode-btn.active{background:#6366f1;border-color:#6366f1;color:#fff}
+.mode-btn{background:var(--border);border:1px solid var(--border2);color:var(--text2);padding:5px 14px;border-radius:7px;cursor:pointer;font-size:12px;transition:all .15s}
+.mode-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .mode-btn.danger{border-color:rgba(239,68,68,.3);color:#ef4444}
 .mode-btn.danger:hover{background:rgba(239,68,68,.15)}
+.mode-btn.import-btn{border-color:rgba(99,102,241,.3);color:var(--accent)}
+.mode-btn.import-btn:hover{background:rgba(99,102,241,.15)}
 .radio-group{display:flex;align-items:center;gap:14px;margin-left:auto}
-.radio-group label{display:flex;align-items:center;gap:5px;color:#94a3b8;font-size:12px;cursor:pointer;white-space:nowrap}
-.radio-group input[type=radio]{accent-color:#6366f1}
+.radio-group label{display:flex;align-items:center;gap:5px;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap}
+.radio-group input[type=radio]{accent-color:var(--accent)}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:500}
 .badge-200{background:rgba(34,197,94,.12);color:#22c55e}
 .badge-403{background:rgba(239,68,68,.12);color:#ef4444}
 .badge-429{background:rgba(234,179,8,.12);color:#eab308}
 .badge-444{background:rgba(100,116,139,.12);color:#64748b}
 .badge-other{background:rgba(99,102,241,.12);color:#6366f1}
-.log-table-wrap{overflow:auto;max-height:520px}
+.log-table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;padding:8px 10px;color:#64748b;border-bottom:1px solid #1e2236;position:sticky;top:0;background:#1a1d2e;white-space:nowrap}
-td{padding:7px 10px;border-bottom:1px solid #13161f;vertical-align:middle}
+th{text-align:left;padding:8px 10px;color:var(--text3);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg3);white-space:nowrap;z-index:1}
+td{padding:7px 10px;border-bottom:1px solid var(--bg);vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(99,102,241,.04)}
 .ip-cell{font-family:monospace;font-size:11px;white-space:nowrap}
-.ua-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;font-size:11px}
-.req-cell{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#94a3b8}
+.ua-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3);font-size:11px}
+.req-cell{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)}
 .token-cell{font-family:monospace;font-size:11px;color:#818cf8;display:flex;align-items:center;gap:6px;min-width:0}
 .token-text{word-break:break-all;flex:1}
-.auto-timer{color:#64748b;font-size:11px}
-.copy-btn{background:none;border:1px solid #2d3144;color:#64748b;padding:1px 6px;border-radius:4px;cursor:pointer;font-size:10px;flex-shrink:0;transition:all .15s}
-.copy-btn:hover{border-color:#6366f1;color:#6366f1}
+.auto-timer{color:var(--text3);font-size:11px}
+.copy-btn{background:none;border:1px solid var(--border2);color:var(--text3);padding:1px 6px;border-radius:4px;cursor:pointer;font-size:10px;flex-shrink:0;transition:all .15s}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Stats */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
@@ -86,27 +103,27 @@ tr:hover td{background:rgba(99,102,241,.04)}
 
 /* Whitelist / Blacklist / UA */
 .ip-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.ip-input{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:9px 12px;border-radius:8px;font-size:13px;font-family:monospace;outline:none;flex:1;min-width:160px}
-.ip-input:focus{border-color:#6366f1}
-.comment-input{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:9px 12px;border-radius:8px;font-size:13px;outline:none;flex:2;min-width:140px}
-.comment-input:focus{border-color:#6366f1}
-.btn-primary{background:#6366f1;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:opacity .15s;white-space:nowrap}
+.ip-input{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:monospace;outline:none;flex:1;min-width:160px}
+.ip-input:focus{border-color:var(--accent)}
+.comment-input{background:var(--bg-input);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;outline:none;flex:2;min-width:140px}
+.comment-input:focus{border-color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:opacity .15s;white-space:nowrap}
 .btn-primary:hover{opacity:.85}
 .btn-danger{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.2);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s}
 .btn-danger:hover{background:rgba(239,68,68,.25)}
 .btn-apply{background:rgba(34,197,94,.12);color:#22c55e;border:1px solid rgba(34,197,94,.2);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s}
 .btn-apply:hover{background:rgba(34,197,94,.2)}
 .apply-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.apply-hint{color:#64748b;font-size:12px}
+.apply-hint{color:var(--text3);font-size:12px}
 
 /* Toast */
-#toast{position:fixed;bottom:28px;right:28px;background:#1a1d2e;border:1px solid #2d3144;padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none}
+#toast{position:fixed;bottom:28px;right:28px;background:var(--bg3);border:1px solid var(--border2);padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none}
 #toast.show{opacity:1;transform:none}
 #toast.ok{border-color:#22c55e;color:#22c55e}
 #toast.err{border-color:#ef4444;color:#ef4444}
 
-.empty{color:#64748b;font-size:13px;padding:20px 0}
-.loading{color:#64748b;font-size:13px}
+.empty{color:var(--text3);font-size:13px;padding:20px 0}
+.loading{color:var(--text3);font-size:13px}
 
 /* 黑名单标签按钮 */
 .bl-badge-btn{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:2px 7px;border-radius:5px;cursor:pointer;font-size:10px;transition:all .15s;flex-shrink:0}
@@ -116,13 +133,11 @@ tr:hover td{background:rgba(99,102,241,.04)}
 .ua-cell-wrap{display:flex;align-items:center;gap:4px;max-width:220px}
 /* 分页控件 */
 .page-controls{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
-.page-size-sel{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;margin-left:auto}
-.page-size-sel:focus{outline:none;border-color:#6366f1}
 /* 批量操作行 */
 .batch-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.batch-row label{color:#94a3b8;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer}
+.batch-row label{color:var(--text2);font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer}
 /* IDC 汇总区域 */
-.idc-section{margin-top:20px;padding-top:16px;border-top:1px solid #1e2236}
+.idc-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .idc-section .card-title{margin-bottom:10px}
 </style>
 </head>
@@ -159,6 +174,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
       <span class="status-dot"></span>
       <span class="status-text">运行中</span>
       <span class="status-text auto-timer" id="auto-timer"></span>
+      <button class="theme-btn" id="theme-btn" onclick="cycleTheme()" title="切换主题">🌙 深色</button>
       <button class="refresh-btn" onclick="manualRefresh()">手动刷新</button>
     </div>
   </div>
@@ -173,6 +189,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <button class="mode-btn active" id="btn-today" onclick="setLogMode('today')">仅显示今日日志</button>
           <button class="mode-btn" id="btn-all" onclick="setLogMode('all')">显示全部日志</button>
           <button class="mode-btn danger" onclick="deleteLogs()">删除7日前的日志</button>
+          <button class="mode-btn import-btn" onclick="document.getElementById('log-import-file').click()">导入日志</button>
+          <button class="mode-btn import-btn" onclick="exportLogs()">导出日志</button>
+          <input type="file" id="log-import-file" accept=".log,.txt" style="display:none" onchange="importLogs(this)">
         </div>
         <!-- 过滤器 -->
         <div class="log-controls">
@@ -195,17 +214,6 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </thead>
             <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
           </table>
-        </div>
-        <div class="page-controls">
-          <button class="mode-btn" id="log-prev-btn" onclick="logPagePrev()">‹ 上一页</button>
-          <span id="log-page-info" style="color:#64748b;font-size:12px">第 1/1 页</span>
-          <button class="mode-btn" id="log-next-btn" onclick="logPageNext()">下一页 ›</button>
-          <select class="page-size-sel" id="log-page-size" onchange="changePageSize(this.value)" title="每页显示条数">
-            <option value="50">50 条/页</option>
-            <option value="100">100 条/页</option>
-            <option value="200">200 条/页</option>
-            <option value="500">500 条/页</option>
-          </select>
         </div>
       </div>
     </div>
@@ -295,10 +303,38 @@ tr:hover td{background:rgba(99,102,241,.04)}
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
-let logPage = 1;
-let logPageSize = parseInt(localStorage.getItem('logPageSize') || '50');
 let blacklistIpSet = new Set();
 let autoTimer, countdown = 300;
+
+// ── 主题 ──────────────────────────────────────────────────────
+const THEMES = ['dark','light','auto'];
+const THEME_LABELS = {dark:'🌙 深色', light:'☀️ 浅色', auto:'💻 跟随系统'};
+let themeMode = localStorage.getItem('theme') || 'dark';
+
+function applyTheme() {
+  const html = document.documentElement;
+  if (themeMode === 'auto') {
+    const sys = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    html.setAttribute('data-theme', sys);
+  } else {
+    html.setAttribute('data-theme', themeMode);
+  }
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = THEME_LABELS[themeMode];
+}
+
+function cycleTheme() {
+  const idx = THEMES.indexOf(themeMode);
+  themeMode = THEMES[(idx + 1) % THEMES.length];
+  localStorage.setItem('theme', themeMode);
+  applyTheme();
+}
+
+// 系统主题变化时自动更新
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if (themeMode === 'auto') applyTheme();
+});
+applyTheme();
 const TABS = {
   logs:         {title:'日志',     loader:loadLogs},
   stats:        {title:'分析',     loader:loadStats},
@@ -387,21 +423,11 @@ function copyText(text) {
 // ── 日志模式切换 ───────────────────────────────────────────────
 function setLogMode(mode) {
   logMode = mode;
-  logPage = 1;
   document.getElementById('btn-today').classList.toggle('active', mode === 'today');
   document.getElementById('btn-all').classList.toggle('active', mode === 'all');
   loadLogs();
 }
 
-// ── 分页控制 ───────────────────────────────────────────────────
-function logPagePrev() { if (logPage > 1) { logPage--; renderLogs(); } }
-function logPageNext() { logPage++; renderLogs(); }
-function changePageSize(val) {
-  logPageSize = parseInt(val);
-  localStorage.setItem('logPageSize', val);
-  logPage = 1;
-  renderLogs();
-}
 
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
@@ -416,7 +442,6 @@ async function loadLogs() {
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
   }
   allLogs = logsData.logs || [];
-  logPage = 1;
   renderLogs();
 }
 
@@ -440,22 +465,13 @@ function renderLogs() {
   // 最新的在最上面
   rows = rows.slice().reverse();
 
-  // 分页
-  const totalPages = Math.max(1, Math.ceil(total / logPageSize));
-  if (logPage > totalPages) logPage = totalPages;
-  const pageRows = rows.slice((logPage - 1) * logPageSize, logPage * logPageSize);
-
-  document.getElementById('log-page-info').textContent = `第 ${logPage}/${totalPages} 页`;
-  document.getElementById('log-prev-btn').disabled = logPage <= 1;
-  document.getElementById('log-next-btn').disabled = logPage >= totalPages;
-
-  if (!pageRows.length) {
+  if (!rows.length) {
     document.getElementById('log-tbody').innerHTML =
       '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
     return;
   }
 
-  document.getElementById('log-tbody').innerHTML = pageRows.map(l => {
+  document.getElementById('log-tbody').innerHTML = rows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
     const ipBtn = isBlacklisted
       ? `<button class="bl-badge-btn" onclick="quickWhitelist('${esc(l.ip)}')">黑名单</button>`
@@ -825,8 +841,41 @@ async function quickBlacklist(ip) {
   else toast(d.error||'封禁失败','err');
 }
 
+// ── 导出日志 ──────────────────────────────────────────────────
+function exportLogs() {
+  const a = document.createElement('a');
+  a.href = BASE + '/api/logs.php?export=1';
+  a.download = '';
+  a.click();
+}
+
+// ── 导入日志（multipart 上传，绕过 post_max_size 限制）──────────
+async function importLogs(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';   // 重置，允许再次选同一文件
+  toast('导入中…');
+  try {
+    const fd = new FormData();
+    fd.append('log', file);
+    const r = await fetch(BASE + '/api/logs.php', {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: fd,
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`✅ 导入成功：新增 ${d.imported} 行，共 ${d.total} 行`);
+      loadLogs();
+    } else {
+      toast(d.error || '导入失败', 'err');
+    }
+  } catch(e) {
+    toast('导入失败：网络错误', 'err');
+  }
+}
+
 // ── 初始化 ────────────────────────────────────────────────────
-document.getElementById('log-page-size').value = String(logPageSize);
 loadLogs();
 resetCountdown();
 </script>
