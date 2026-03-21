@@ -17,6 +17,7 @@ define('WHITELIST_CONF',   '/etc/nginx/subscribe/whitelist.conf');
 define('BLACKLIST_JSON',   '/etc/nginx/subscribe/blacklist.json');
 define('BLACKLIST_CONF',   '/etc/nginx/subscribe/blacklist.conf');
 define('CLOUD_GEO_LOG',    '/var/log/subscribe/update_cloud_geo.log');
+define('CLOUD_GEO_CONF',   '/etc/nginx/subscribe/cloud_geo.conf');
 define('UA_BLACKLIST_JSON','/etc/nginx/subscribe/ua_blacklist.json');
 define('UA_CUSTOM_CONF',   '/etc/nginx/subscribe/ua_custom.conf');
 

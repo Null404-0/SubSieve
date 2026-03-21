@@ -29,21 +29,26 @@ if ($method === 'POST') {
     json_out(['ok' => true]);
 }
 
-// DELETE — 删除条目
+// DELETE — 删除条目（支持单个 ip 或批量 ips 数组）
 if ($method === 'DELETE') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
-    $ip   = trim($body['ip'] ?? '');
 
-    if (!$ip) json_err('缺少 ip 参数');
+    $toRemove = [];
+    if (!empty($body['ips']) && is_array($body['ips'])) {
+        $toRemove = array_map('trim', $body['ips']);
+    } else {
+        $ip = trim($body['ip'] ?? '');
+        if (!$ip) json_err('缺少 ip 参数');
+        $toRemove = [$ip];
+    }
 
     $lines = file_exists(WHITELIST_IPS)
         ? file(WHITELIST_IPS, FILE_IGNORE_NEW_LINES)
         : [];
 
-    $new = array_filter($lines, function($l) use ($ip) {
-        $entry = strtok(trim($l), ' ');
-        $entry = strtok($entry, "\t");
-        return $entry !== $ip;
+    $new = array_filter($lines, function($l) use ($toRemove) {
+        $entry = strtok(trim($l), " \t");
+        return !in_array($entry, $toRemove);
     });
 
     file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);

@@ -107,6 +107,23 @@ tr:hover td{background:rgba(99,102,241,.04)}
 
 .empty{color:#64748b;font-size:13px;padding:20px 0}
 .loading{color:#64748b;font-size:13px}
+
+/* 黑名单标签按钮 */
+.bl-badge-btn{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:2px 7px;border-radius:5px;cursor:pointer;font-size:10px;transition:all .15s;flex-shrink:0}
+.bl-badge-btn:hover{background:rgba(239,68,68,.3)}
+/* 请求/UA 单元格（带复制按钮） */
+.req-cell-wrap{display:flex;align-items:center;gap:4px;max-width:260px}
+.ua-cell-wrap{display:flex;align-items:center;gap:4px;max-width:220px}
+/* 分页控件 */
+.page-controls{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.page-size-sel{background:#0f1117;border:1px solid #2d3144;color:#e2e8f0;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;margin-left:auto}
+.page-size-sel:focus{outline:none;border-color:#6366f1}
+/* 批量操作行 */
+.batch-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.batch-row label{color:#94a3b8;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer}
+/* IDC 汇总区域 */
+.idc-section{margin-top:20px;padding-top:16px;border-top:1px solid #1e2236}
+.idc-section .card-title{margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -179,6 +196,17 @@ tr:hover td{background:rgba(99,102,241,.04)}
             <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
           </table>
         </div>
+        <div class="page-controls">
+          <button class="mode-btn" id="log-prev-btn" onclick="logPagePrev()">‹ 上一页</button>
+          <span id="log-page-info" style="color:#64748b;font-size:12px">第 1/1 页</span>
+          <button class="mode-btn" id="log-next-btn" onclick="logPageNext()">下一页 ›</button>
+          <select class="page-size-sel" id="log-page-size" onchange="changePageSize(this.value)" title="每页显示条数">
+            <option value="50">50 条/页</option>
+            <option value="100">100 条/页</option>
+            <option value="200">200 条/页</option>
+            <option value="500">500 条/页</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -192,6 +220,14 @@ tr:hover td{background:rgba(99,102,241,.04)}
         <div class="card">
           <div class="card-title">今日 Top Token</div>
           <div id="top-tokens"><div class="loading">加载中…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">可疑 Token（被多IP拉取）</div>
+          <div id="susp-tokens"><div class="loading">加载中…</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">可疑 IP（拉取多Token）</div>
+          <div id="susp-ips"><div class="loading">加载中…</div></div>
         </div>
         <div class="card" style="grid-column:1/-1">
           <div class="card-title">可疑 UA（触发403）</div>
@@ -221,7 +257,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
       <div class="card">
         <div class="card-title">添加白名单 IP</div>
         <div class="ip-form">
-          <input class="ip-input" id="wl-ip" placeholder="1.2.3.4/32">
+          <input class="ip-input" id="wl-ip" placeholder="支持批量，逗号分隔：1.1.1.1,2.2.2.0/24">
           <input class="comment-input" id="wl-comment" placeholder="备注（可选）">
           <button class="btn-primary" onclick="wlAdd()">添加</button>
         </div>
@@ -259,6 +295,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
 const BASE = <?= json_encode(ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH : '') ?>;
 let allLogs = [];
 let logMode = 'today';   // 'today' | 'all'
+let logPage = 1;
+let logPageSize = parseInt(localStorage.getItem('logPageSize') || '50');
+let blacklistIpSet = new Set();
 let autoTimer, countdown = 300;
 const TABS = {
   logs:         {title:'日志',     loader:loadLogs},
@@ -348,20 +387,36 @@ function copyText(text) {
 // ── 日志模式切换 ───────────────────────────────────────────────
 function setLogMode(mode) {
   logMode = mode;
+  logPage = 1;
   document.getElementById('btn-today').classList.toggle('active', mode === 'today');
   document.getElementById('btn-all').classList.toggle('active', mode === 'all');
   loadLogs();
 }
 
+// ── 分页控制 ───────────────────────────────────────────────────
+function logPagePrev() { if (logPage > 1) { logPage--; renderLogs(); } }
+function logPageNext() { logPage++; renderLogs(); }
+function changePageSize(val) {
+  logPageSize = parseInt(val);
+  localStorage.setItem('logPageSize', val);
+  logPage = 1;
+  renderLogs();
+}
+
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
   document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
-  const data = await apiFetch('/api/logs.php?mode=' + logMode);
-  if (!data.ok) {
-    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(data.error||'未知错误') + '</td></tr>';
-    toast('加载日志失败: ' + (data.error||''), 'err'); return;
+  const [logsData, blData] = await Promise.all([
+    apiFetch('/api/logs.php?mode=' + logMode),
+    apiFetch('/api/blacklist.php?no_idc=1'),
+  ]);
+  blacklistIpSet = new Set((blData.entries || []).map(e => e.ip));
+  if (!logsData.ok) {
+    document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
+    toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
   }
-  allLogs = data.logs || [];
+  allLogs = logsData.logs || [];
+  logPage = 1;
   renderLogs();
 }
 
@@ -379,32 +434,43 @@ function renderLogs() {
     return true;
   });
 
-  document.getElementById('log-count').textContent = `${rows.length} / ${allLogs.length} 条`;
+  const total = rows.length;
+  document.getElementById('log-count').textContent = `${total} / ${allLogs.length} 条`;
 
   // 最新的在最上面
   rows = rows.slice().reverse();
 
-  if (!rows.length) {
+  // 分页
+  const totalPages = Math.max(1, Math.ceil(total / logPageSize));
+  if (logPage > totalPages) logPage = totalPages;
+  const pageRows = rows.slice((logPage - 1) * logPageSize, logPage * logPageSize);
+
+  document.getElementById('log-page-info').textContent = `第 ${logPage}/${totalPages} 页`;
+  document.getElementById('log-prev-btn').disabled = logPage <= 1;
+  document.getElementById('log-next-btn').disabled = logPage >= totalPages;
+
+  if (!pageRows.length) {
     document.getElementById('log-tbody').innerHTML =
       '<tr><td colspan="7" class="empty">暂无匹配记录</td></tr>';
     return;
   }
 
-  document.getElementById('log-tbody').innerHTML = rows.map(l => {
+  document.getElementById('log-tbody').innerHTML = pageRows.map(l => {
+    const isBlacklisted = blacklistIpSet.has(l.ip);
+    const ipBtn = isBlacklisted
+      ? `<button class="bl-badge-btn" onclick="quickWhitelist('${esc(l.ip)}')">黑名单</button>`
+      : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
     const tokenHtml = l.token
-      ? `<div class="token-cell"><span class="token-text" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" onclick="copyText('${esc(l.token)}')">复制</button></div>`
+      ? `<div class="token-cell"><span class="token-text" title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
     return `
     <tr>
       <td style="white-space:nowrap;color:#64748b;font-size:11px">${esc(l.time)}</td>
-      <td class="ip-cell">
-        ${esc(l.ip)}
-        <button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>
-      </td>
+      <td class="ip-cell">${esc(l.ip)} ${ipBtn}</td>
       <td>${statusBadge(l.status)}</td>
       <td style="min-width:120px;max-width:220px">${tokenHtml}</td>
-      <td class="req-cell" title="${esc(l.request)}">${esc(l.request)}</td>
-      <td class="ua-cell" title="${esc(l.ua)}">${esc(l.ua) || '—'}</td>
+      <td><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">复制</button></div></td>
+      <td><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">复制</button>` : ''}</div></td>
       <td></td>
     </tr>`;
   }).join('');
@@ -424,11 +490,27 @@ async function deleteLogs() {
   }
 }
 
+// ── 从日志加入白名单 ───────────────────────────────────────────
+async function quickWhitelist(ip) {
+  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
+  const d1 = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  if (!d1.ok) { toast(d1.error || '解封失败', 'err'); return; }
+  const d2 = await apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  // 若IP已在白名单则视为成功（目的已达到）
+  if (d2.ok || (d2.error && d2.error.includes('已在白名单'))) {
+    toast(`✅ ${ip} 已加入白名单`); loadLogs();
+  } else {
+    toast(d2.error || '加入白名单失败', 'err');
+  }
+}
+
 // ── 分析 ──────────────────────────────────────────────────────
 async function loadStats() {
   const data = await apiFetch('/api/stats.php');
   if (!data.ok) {
-    ['top-ips','top-tokens','bad-uas'].forEach(id => {
+    ['top-ips','top-tokens','bad-uas','susp-tokens','susp-ips'].forEach(id => {
       document.getElementById(id).innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     });
     toast('加载统计失败: ' + (data.error||''), 'err'); return;
@@ -457,7 +539,7 @@ async function loadStats() {
       <span class="top-rank">${i+1}</span>
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
         <span class="token-text" title="${esc(r.token_full)}">${esc(r.token_full)}</span>
-        <button class="copy-btn" onclick="copyText('${esc(r.token_full)}')">复制</button>
+        <button class="copy-btn" data-val="${esc(r.token_full)}" onclick="copyText(this.dataset.val)">复制</button>
       </span>
       <span class="top-count" style="white-space:nowrap;margin-left:6px">${r.count}次</span>
       <span class="top-sub" style="margin-left:8px">${esc(r.last_time)}</span>
@@ -475,6 +557,27 @@ async function loadStats() {
       </tr>`).join('')}
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
   document.getElementById('bad-uas').innerHTML = uaHtml;
+
+  // 可疑 Token
+  const suspToks = data.susp_tokens || [];
+  document.getElementById('susp-tokens').innerHTML = suspToks.length ? suspToks.map(r => `
+    <div class="top-row">
+      <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
+        <span class="token-text" title="${esc(r.token)}">${esc(r.token.substr(0,20))}…</span>
+        <button class="copy-btn" data-val="${esc(r.token)}" onclick="copyText(this.dataset.val)">复制</button>
+      </span>
+      <span class="top-count" style="white-space:nowrap">${r.ip_count} 个不同IP</span>
+    </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
+
+  // 可疑 IP
+  const suspIps = data.susp_ips || [];
+  document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => `
+    <div class="top-row">
+      <span class="top-val">${esc(r.ip)}
+        <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
+      </span>
+      <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token</span>
+    </div>`).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
 }
 
 // ── 封禁UA ─────────────────────────────────────────────────────
@@ -552,9 +655,14 @@ async function loadWhitelist() {
     return;
   }
   document.getElementById('wl-list').innerHTML = `
-    <table><thead><tr><th>IP / CIDR</th><th>备注</th><th>操作</th></tr></thead>
+    <div class="batch-row">
+      <label><input type="checkbox" id="wl-check-all" onchange="toggleAllWl(this)"> 全选</label>
+      <button class="btn-danger" onclick="wlBatchDel()">批量删除选中</button>
+    </div>
+    <table><thead><tr><th style="width:30px"></th><th>IP / CIDR</th><th>备注</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
+        <td><input type="checkbox" class="wl-check" value="${esc(e.ip)}"></td>
         <td class="ip-cell">${esc(e.ip)}</td>
         <td style="color:#64748b">${esc(e.comment)||'—'}</td>
         <td><button class="btn-danger" onclick="wlDel('${esc(e.ip)}')">删除</button></td>
@@ -562,22 +670,29 @@ async function loadWhitelist() {
     </tbody></table>`;
 }
 
+function toggleAllWl(cb) {
+  document.querySelectorAll('.wl-check').forEach(c => c.checked = cb.checked);
+}
+
 async function wlAdd() {
-  const ip  = document.getElementById('wl-ip').value.trim();
+  const raw = document.getElementById('wl-ip').value.trim();
   const cmt = document.getElementById('wl-comment').value.trim();
-  if (!ip) { toast('请输入IP','err'); return; }
-  const d = await apiFetch('/api/whitelist.php', {
-    method:'POST', body:JSON.stringify({ip,comment:cmt}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-  });
-  if (d.ok) {
-    document.getElementById('wl-ip').value = '';
-    document.getElementById('wl-comment').value = '';
-    toast('已添加，点击"生效"应用');
-    loadWhitelist();
-  } else {
-    toast(d.error || '添加失败','err');
+  if (!raw) { toast('请输入IP','err'); return; }
+  const ips = raw.split(',').map(s => s.trim()).filter(Boolean);
+  let ok = 0, errs = [];
+  for (const ip of ips) {
+    const d = await apiFetch('/api/whitelist.php', {
+      method:'POST', body:JSON.stringify({ip, comment:cmt}),
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    });
+    if (d.ok) ok++; else errs.push(`${ip}: ${d.error}`);
   }
+  document.getElementById('wl-ip').value = '';
+  document.getElementById('wl-comment').value = '';
+  if (!errs.length) toast(`✅ 已添加 ${ok} 个，点击"生效"应用`);
+  else if (ok) toast(`添加 ${ok} 个成功，${errs.length} 个失败`, 'err');
+  else toast(errs[0]||'添加失败', 'err');
+  loadWhitelist();
 }
 
 async function wlDel(ip) {
@@ -587,6 +702,18 @@ async function wlDel(ip) {
   });
   if (d.ok) { toast('已删除，点击"生效"应用'); loadWhitelist(); }
   else toast(d.error||'删除失败','err');
+}
+
+async function wlBatchDel() {
+  const ips = Array.from(document.querySelectorAll('.wl-check:checked')).map(c => c.value);
+  if (!ips.length) { toast('请先勾选要删除的条目','err'); return; }
+  if (!confirm(`确定删除选中的 ${ips.length} 个IP/CIDR？`)) return;
+  const d = await apiFetch('/api/whitelist.php', {
+    method:'DELETE', body:JSON.stringify({ips}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) { toast(`✅ 已删除 ${ips.length} 个，点击"生效"应用`); loadWhitelist(); }
+  else toast(d.error||'批量删除失败','err');
 }
 
 async function wlApply() {
@@ -604,20 +731,59 @@ async function loadBlacklist() {
     toast('加载失败: ' + (data.error||''), 'err'); return;
   }
   const entries = data.entries || [];
-  if (!entries.length) {
-    document.getElementById('bl-list').innerHTML = '<div class="empty">黑名单为空</div>';
-    return;
-  }
-  document.getElementById('bl-list').innerHTML = `
-    <table><thead><tr><th>IP / CIDR</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
+  const idcSummary = data.idc_summary || [];
+
+  let html = '';
+  if (entries.length) {
+    html += `
+    <div class="batch-row">
+      <label><input type="checkbox" id="bl-check-all" onchange="toggleAllBl(this)"> 全选</label>
+      <button class="btn-danger" onclick="blBatchDel()">批量解封选中</button>
+    </div>
+    <table><thead><tr><th style="width:30px"></th><th>IP / CIDR</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
+        <td><input type="checkbox" class="bl-check" value="${esc(e.ip)}"></td>
         <td class="ip-cell">${esc(e.ip)}</td>
         <td style="color:#64748b">${esc(e.comment)||'—'}</td>
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="blDel('${esc(e.ip)}')">解封</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+  } else {
+    html += '<div class="empty">手动黑名单为空</div>';
+  }
+
+  if (idcSummary.length) {
+    html += `<div class="idc-section">
+      <div class="card-title">系统内置IDC封禁（自动拦截，共 ${idcSummary.reduce((s,r)=>s+r.count,0)} 条CIDR）</div>
+      <table><thead><tr><th>云服务商 / IDC</th><th>CIDR数量</th></tr></thead>
+      <tbody>${idcSummary.map(s => `
+        <tr>
+          <td class="ip-cell">${esc(s.name)}</td>
+          <td style="color:#6366f1;font-weight:600">${s.count} 条</td>
+        </tr>`).join('')}
+      </tbody></table>
+    </div>`;
+  }
+
+  document.getElementById('bl-list').innerHTML = html;
+}
+
+function toggleAllBl(cb) {
+  document.querySelectorAll('.bl-check').forEach(c => c.checked = cb.checked);
+}
+
+async function blBatchDel() {
+  const ips = Array.from(document.querySelectorAll('.bl-check:checked')).map(c => c.value);
+  if (!ips.length) { toast('请先勾选要解封的条目','err'); return; }
+  if (!confirm(`确定解封选中的 ${ips.length} 个IP/CIDR？`)) return;
+  const d = await apiFetch('/api/blacklist.php', {
+    method:'DELETE', body:JSON.stringify({ips}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) { toast(`✅ 已解封 ${ips.length} 个并立即生效`); loadBlacklist(); }
+  else toast(d.error||'批量解封失败','err');
 }
 
 async function blAdd() {
@@ -660,6 +826,7 @@ async function quickBlacklist(ip) {
 }
 
 // ── 初始化 ────────────────────────────────────────────────────
+document.getElementById('log-page-size').value = String(logPageSize);
 loadLogs();
 resetCountdown();
 </script>
