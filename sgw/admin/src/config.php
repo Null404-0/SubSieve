@@ -29,7 +29,8 @@ if (file_exists(SETTINGS_JSON)) {
 
 define('ADMIN_USER',        $_sg['admin_user']      ?? (getenv('ADMIN_USER')        ?: 'admin'));
 define('ADMIN_PASS',        $_sg['admin_pass']      ?? (getenv('ADMIN_PASS')        ?: ''));
-define('NGINX_RELOAD_SIGNAL', '/etc/nginx/subscribe/.reload');
+define('NGINX_RELOAD_SIGNAL',     '/etc/nginx/subscribe/.reload');
+define('WHITELIST_RELOAD_SIGNAL', '/etc/nginx/subscribe/.reload_whitelist');
 define('GATEWAY_PORT',      (int)(getenv('GATEWAY_PORT') ?: 443));
 define('SESSION_LIFETIME',  (int)(getenv('SESSION_LIFETIME') ?: 28800)); // 8小时
 // 后台访问路径前缀，留空则不校验（例如 ef9d1566 → 必须访问 /ef9d1566 才能进入后台）
@@ -59,6 +60,10 @@ function json_err(string $msg, int $code = 400): void {
  */
 function nginx_reload(): bool {
     return file_put_contents(NGINX_RELOAD_SIGNAL, '1', LOCK_EX) !== false;
+}
+
+function whitelist_reload(): bool {
+    return file_put_contents(WHITELIST_RELOAD_SIGNAL, '1', LOCK_EX) !== false;
 }
 
 // ── V2B 数据库接口（预留，后续填充）─────────────────────────

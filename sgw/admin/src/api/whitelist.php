@@ -29,6 +29,7 @@ if ($method === 'POST') {
         }
         if ($added > 0) {
             file_put_contents(WHITELIST_IPS, implode("\n", $newLines) . "\n", FILE_APPEND | LOCK_EX);
+            whitelist_reload();
         }
         json_out(['ok' => true, 'added' => $added, 'skipped' => $skipped, 'invalid' => $invalid]);
     }
@@ -48,6 +49,7 @@ if ($method === 'POST') {
 
     $line = $ip . ($comment ? "  # $comment" : '');
     file_put_contents(WHITELIST_IPS, $line . "\n", FILE_APPEND | LOCK_EX);
+    whitelist_reload();
 
     json_out(['ok' => true]);
 }
@@ -80,6 +82,7 @@ if ($method === 'PATCH') {
 
     if (!$found) json_err('未找到该IP');
     file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);
+    whitelist_reload();
     json_out(['ok' => true]);
 }
 
@@ -106,17 +109,8 @@ if ($method === 'DELETE') {
     });
 
     file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);
+    whitelist_reload();
     json_out(['ok' => true]);
-}
-
-// PUT — 应用白名单（触发 reload_whitelist.sh + nginx reload）
-if ($method === 'PUT') {
-    // 在 gateway 容器内执行 reload_whitelist.sh
-    $result = gateway_exec('/scripts/reload_whitelist.sh');
-    if (str_contains($result['output'], 'error') || str_contains($result['output'], 'failed')) {
-        json_err('生效失败: ' . $result['output']);
-    }
-    json_out(['ok' => true, 'msg' => '白名单已生效']);
 }
 
 json_err('不支持的请求方式', 405);
