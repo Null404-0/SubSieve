@@ -70,5 +70,8 @@ fi
     done
 ) &
 
+log "启动 nginx reload watcher..."
+/scripts/nginx_reload_watcher.sh &
+
 log "启动 nginx..."
 exec nginx -g 'daemon off;'
