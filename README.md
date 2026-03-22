@@ -80,14 +80,14 @@ chmod +x setup.sh
 部署完成后，访问信息会打印在终端，同时保存到 `DEPLOY_INFO.txt`。
 ## 食用方法
 部署完成后，将原订阅链接中的域名和端口替换为部署了本项目的域名和端口即可。
-
+```
 示例：
 # 原订阅链接
 https://aaaa.bbbb.com:11111/api/v1/client/subscribe?token=xxxxxxxxxxxxxxxxxxxxxxx
 
 # 替换为
 https://your-domain.com:端口/api/v1/client/subscribe?token=xxxxxxxxxxxxxxxxxxxxxxx
-
+```
 
 ---
 
