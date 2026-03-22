@@ -21,6 +21,17 @@ if ((empty($_preSg['upstream_url']) || empty($_preSg['subscribe_path'])) && file
             $_preSg['subscribe_path'] = $_m[1];
     }
 }
+// 若 upstream_url 无显式端口，从 protect.conf 的 set $upstream_backend 行补全端口
+if (!empty($_preSg['upstream_url']) && !parse_url($_preSg['upstream_url'], PHP_URL_PORT) && file_exists(PROTECT_CONF)) {
+    $_cr2 = @file_get_contents(PROTECT_CONF);
+    if ($_cr2 && preg_match('/set\s+\$upstream_backend\s+(\S+);/m', $_cr2, $_cm2)) {
+        $_cp2 = parse_url(rtrim($_cm2[1], ';'), PHP_URL_PORT);
+        if ($_cp2) {
+            $_sp2 = parse_url($_preSg['upstream_url']);
+            $_preSg['upstream_url'] = ($_sp2['scheme'] ?? 'https') . '://' . ($_sp2['host'] ?? '') . ':' . $_cp2;
+        }
+    }
+}
 // 分离 upstream_url 中的端口，用于端口输入框单独显示
 $_preSgPort = 443;
 $_preSgUrlClean = $_preSg['upstream_url'] ?? '';

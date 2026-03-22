@@ -16,6 +16,19 @@ if ($method === 'GET') {
                 $s['subscribe_path'] = $s['subscribe_path'] ?? $parsed['subscribe_path'];
             }
         }
+        // 若 upstream_url 无显式端口，从 protect.conf 的 set $upstream_backend 行补全
+        // 该行仅存在于 entrypoint 模板生成的 protect.conf（代表 V2B_BACKEND 中的原始端口）
+        // PHP 重写 protect.conf 后该行消失，故此检查不会误覆盖管理员的主动设置
+        if (!empty($s['upstream_url']) && !parse_url($s['upstream_url'], PHP_URL_PORT)) {
+            $_cr = file_exists(PROTECT_CONF) ? @file_get_contents(PROTECT_CONF) : '';
+            if ($_cr && preg_match('/set\s+\$upstream_backend\s+(\S+);/m', $_cr, $_cm)) {
+                $_cp = parse_url(rtrim($_cm[1], ';'), PHP_URL_PORT);
+                if ($_cp) {
+                    $_sp = parse_url($s['upstream_url']);
+                    $s['upstream_url'] = ($_sp['scheme'] ?? 'https') . '://' . ($_sp['host'] ?? '') . ':' . $_cp;
+                }
+            }
+        }
         json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo]);
     } catch (Throwable $e) {
         json_err('PHP错误: ' . $e->getMessage());
