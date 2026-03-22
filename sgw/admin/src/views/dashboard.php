@@ -250,7 +250,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </div>
           </div>
           <div style="font-size:10px;color:var(--text3);margin-bottom:10px">
-            右侧计数：<span style="color:#22c55e">●</span>成功 / <span style="color:#ef4444">●</span>403拦截 / <span style="color:#eab308">●</span>限速429 / <span style="color:#64748b">●</span>黑名单444
+            右侧计数：<span style="color:#22c55e">●</span>成功 / <span style="color:#ef4444">●</span>拦截403 / <span style="color:#eab308">●</span>限速429 / <span style="color:#64748b">●</span>断连444
           </div>
           <div id="top-ips"><div class="loading">加载中…</div></div>
           <div id="stats-ips-pg" class="page-controls" style="display:none;margin-top:10px"></div>
@@ -867,7 +867,7 @@ function renderStats() {
         <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
       </span>
       <span class="top-count">${r.total}次</span>
-      <span class="top-sub" style="margin-left:8px;font-size:11px" title="成功/手动黑名单/限速/连接重置">
+      <span class="top-sub" style="margin-left:8px;font-size:11px" title="成功200 / 拦截403 / 限速429 / 断连444（非订阅路径或HTTP明文）">
         <span style="color:#22c55e">${r.s200}</span>/<span style="color:#ef4444">${r.s403}</span>/<span style="color:#eab308">${r.s429}</span>/<span style="color:#64748b">${r.s444}</span>
       </span>
     </div>`).join('') : '<div class="empty">暂无数据</div>';
