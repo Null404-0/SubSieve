@@ -147,6 +147,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
 /* 黑名单标签按钮 */
 .bl-badge-btn{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:2px 7px;border-radius:5px;cursor:pointer;font-size:10px;transition:all .15s;flex-shrink:0}
 .bl-badge-btn:hover{background:rgba(239,68,68,.3)}
+/* 白名单标签按钮 */
+.wl-badge-btn{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);padding:2px 7px;border-radius:5px;cursor:pointer;font-size:10px;transition:all .15s;flex-shrink:0}
+.wl-badge-btn:hover{background:rgba(34,197,94,.3)}
 /* 请求/UA 单元格（带复制按钮） */
 .req-cell-wrap{display:flex;align-items:center;gap:4px;max-width:260px}
 .ua-cell-wrap{display:flex;align-items:center;gap:4px;max-width:220px}
@@ -495,6 +498,7 @@ let logMode = 'today';   // 'today' | 'all'
 let logLimit = 100;      // 0=瀑布流（无限制）
 let logPage = 1;         // 当前页（分页模式）
 let blacklistIpSet = new Set();
+let whitelistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10};
@@ -683,12 +687,14 @@ function isCloudIp(ip) {
 // ── 日志 ──────────────────────────────────────────────────────
 async function loadLogs() {
   document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="loading">加载中…</td></tr>';
-  const [logsData, blData, cloudData] = await Promise.all([
+  const [logsData, blData, cloudData, wlData] = await Promise.all([
     apiFetch('/api/logs.php?mode=' + logMode),
     apiFetch('/api/blacklist.php?no_idc=1'),
     apiFetch('/api/blacklist.php?cloud_cidrs=1'),
+    apiFetch('/api/whitelist.php'),
   ]);
   blacklistIpSet = new Set((blData.entries || []).map(e => e.ip));
+  whitelistIpSet = new Set((wlData.entries || []).map(e => e.ip));
   cloudCidrs = cloudData.cidrs || [];
   if (!logsData.ok) {
     document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
@@ -764,12 +770,15 @@ function renderLogs() {
 function renderLogRows(rows) {
   document.getElementById('log-tbody').innerHTML = rows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
-    const isCloud = !isBlacklisted && isCloudIp(l.ip);
+    const isWhitelisted = !isBlacklisted && whitelistIpSet.has(l.ip);
+    const isCloud = !isBlacklisted && !isWhitelisted && isCloudIp(l.ip);
     const ipBtn = isBlacklisted
       ? `<button class="bl-badge-btn" onclick="quickWhitelist('${esc(l.ip)}')">黑名单</button>`
-      : isCloud
-        ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
-        : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
+      : isWhitelisted
+        ? `<button class="wl-badge-btn" onclick="quickRemoveWhitelist('${esc(l.ip)}')">白名单</button>`
+        : isCloud
+          ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
+          : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
     const tokenHtml = l.token
       ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
@@ -800,20 +809,30 @@ async function deleteLogs() {
   }
 }
 
-// ── 从日志加入白名单 ───────────────────────────────────────────
+// ── 从日志解封（点击"黑名单"徽章：仅移除黑名单）────────────────
 async function quickWhitelist(ip) {
-  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
-  const d1 = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
+  if (!confirm(`是否解封 ${ip}？`)) return;
+  const d = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
-  if (!d1.ok) { toast(d1.error || '解封失败', 'err'); return; }
-  const d2 = await apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
-  // 若IP已在白名单则视为成功（目的已达到）
-  if (d2.ok || (d2.error && d2.error.includes('已在白名单'))) {
-    toast(`✅ ${ip} 已加入白名单`); loadLogs();
+  if (d.ok) {
+    toast(`✅ ${ip} 已解封`);
+    blacklistIpSet.delete(ip);
+    renderLogs();
   } else {
-    toast(d2.error || '加入白名单失败', 'err');
+    toast(d.error || '解封失败', 'err');
   }
+}
+
+// ── 从日志移出白名单 ───────────────────────────────────────────
+async function quickRemoveWhitelist(ip) {
+  if (!confirm(`是否移出白名单？`)) return;
+  const d = await apiFetch('/api/whitelist.php', {method:'DELETE', body:JSON.stringify({ip}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  if (!d.ok) { toast(d.error || '移除失败', 'err'); return; }
+  await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+  toast(`✅ ${ip} 已移出白名单并生效`);
+  whitelistIpSet.delete(ip);
+  renderLogs();
 }
 
 // ── 分析 ──────────────────────────────────────────────────────
@@ -967,8 +986,8 @@ async function quickWhitelistIp(ip) {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok || (d.error && d.error.includes('已在白名单'))) {
-    toast(`✅ ${ip} 已加入白名单`);
-    // 从本地缓存移除该IP并立即重绘，无需等待重新拉取数据
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ ${ip} 已加入白名单并生效`);
     if (allStatsData) {
       allStatsData.susp_ips = (allStatsData.susp_ips || []).filter(r => r.ip !== ip);
       renderStats();
@@ -1223,9 +1242,15 @@ async function wlAdd() {
   }
   document.getElementById('wl-ip').value = '';
   document.getElementById('wl-comment').value = '';
-  if (!errs.length) toast(`✅ 已添加 ${ok} 个，点击"生效"应用`);
-  else if (ok) toast(`添加 ${ok} 个成功，${errs.length} 个失败`, 'err');
-  else toast(errs[0]||'添加失败', 'err');
+  if (!errs.length) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ 已添加 ${ok} 个并生效`);
+  } else if (ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`添加 ${ok} 个成功并生效，${errs.length} 个失败`, 'err');
+  } else {
+    toast(errs[0]||'添加失败', 'err');
+  }
   loadWhitelist();
 }
 
@@ -1234,8 +1259,10 @@ async function wlDel(ip) {
     method:'DELETE', body:JSON.stringify({ip}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) { toast('已删除，点击"生效"应用'); loadWhitelist(); }
-  else toast(d.error||'删除失败','err');
+  if (d.ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast('✅ 已删除并生效'); loadWhitelist();
+  } else toast(d.error||'删除失败','err');
 }
 
 async function wlBatchDel() {
@@ -1246,8 +1273,10 @@ async function wlBatchDel() {
     method:'DELETE', body:JSON.stringify({ips}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) { toast(`✅ 已删除 ${ips.length} 个，点击"生效"应用`); loadWhitelist(); }
-  else toast(d.error||'批量删除失败','err');
+  if (d.ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ 已删除 ${ips.length} 个并生效`); loadWhitelist();
+  } else toast(d.error||'批量删除失败','err');
 }
 
 async function wlApply() {
