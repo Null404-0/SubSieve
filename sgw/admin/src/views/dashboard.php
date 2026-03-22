@@ -202,8 +202,8 @@ tr:hover td{background:rgba(99,102,241,.04)}
       <span class="status-dot"></span>
       <span class="status-text">运行中</span>
       <span class="status-text auto-timer" id="auto-timer"></span>
-      <button class="theme-btn" id="theme-btn" onclick="cycleTheme()" title="切换主题">🌙 深色</button>
       <button class="refresh-btn" onclick="manualRefresh()">手动刷新</button>
+      <button class="theme-btn" id="theme-btn" onclick="cycleTheme()" title="切换主题">🌙 深色</button>
     </div>
   </div>
 
@@ -217,6 +217,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <button class="mode-btn active" id="btn-today" onclick="setLogMode('today')">仅显示今日日志</button>
           <button class="mode-btn" id="btn-all" onclick="setLogMode('all')">显示全部日志</button>
           <button class="mode-btn danger" onclick="deleteLogs()">删除7日前的日志</button>
+          <button class="mode-btn danger" onclick="deleteAllLogs()">删除当前所有日志</button>
           <button class="mode-btn import-btn" onclick="document.getElementById('log-import-file').click()">导入日志</button>
           <button class="mode-btn import-btn" onclick="exportLogs()">导出日志</button>
           <input type="file" id="log-import-file" accept=".log,.txt" style="display:none" onchange="importLogs(this)">
@@ -226,6 +227,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <input class="log-filter" id="filter-ip" placeholder="过滤 IP" oninput="logPage=1;renderLogs()">
           <input class="log-filter" id="filter-status" placeholder="状态码 如 403" oninput="logPage=1;renderLogs()">
           <input class="log-filter" id="filter-token" placeholder="过滤 Token（自动去重）" oninput="logPage=1;renderLogs()">
+          <input class="log-filter" id="filter-ua" placeholder="过滤 UA（不分大小写）" oninput="logPage=1;renderLogs()">
           <span class="auto-timer" id="log-count">—</span>
           <div class="radio-group">
             <label><input type="radio" name="sub-filter" value="subscribe" checked onchange="logPage=1;renderLogs()"> 仅订阅相关</label>
@@ -469,6 +471,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
               <input class="ip-input" id="cfg-confirm-pass" type="password" placeholder="再次输入新密码" style="width:100%">
             </div>
             <div class="apply-hint" style="color:#eab308">⚠️ 修改后需重新登录，请牢记新密码</div>
+            <div class="apply-hint" style="color:#64748b;font-size:11px;line-height:1.5">如忘记密码，请在宿主机 SSH 执行：<br><code style="background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;font-size:11px;user-select:all">docker exec subscribe-admin cat /etc/nginx/subscribe/admin_settings.json</code></div>
             <button class="btn-primary" onclick="saveCredSettings()">保存凭证设置</button>
           </div>
         </div>
@@ -728,6 +731,7 @@ function renderLogs() {
   const fIp     = document.getElementById('filter-ip').value.trim().toLowerCase();
   const fStatus = document.getElementById('filter-status').value.trim();
   const fToken  = document.getElementById('filter-token').value.trim().toLowerCase();
+  const fUa     = document.getElementById('filter-ua').value.trim().toLowerCase();
   const subOnly = document.querySelector('input[name="sub-filter"][value="subscribe"]').checked;
 
   let rows = allLogs.filter(l => {
@@ -735,6 +739,7 @@ function renderLogs() {
     if (fIp     && !l.ip.toLowerCase().includes(fIp)) return false;
     if (fStatus && String(l.status) !== fStatus) return false;
     if (fToken  && !l.token.toLowerCase().includes(fToken)) return false;
+    if (fUa     && !(l.ua || '').toLowerCase().includes(fUa)) return false;
     return true;
   });
 
@@ -798,7 +803,7 @@ function renderLogRows(rows) {
         ? `<button class="wl-badge-btn" onclick="quickRemoveWhitelist('${esc(l.ip)}')">白名单</button>`
         : isCloud
           ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
-          : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button><button class="add-btn-sm" style="background:rgba(99,102,241,.15);color:#818cf8;border-color:rgba(99,102,241,.3)" onclick="quickAddWhitelistFromLog('${esc(l.ip)}')">白</button>`;
+          : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button><button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickAddWhitelistFromLog('${esc(l.ip)}')">白</button>`;
     const tokenHtml = l.token
       ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
@@ -823,6 +828,21 @@ async function deleteLogs() {
   });
   if (d.ok) {
     toast(`✅ 已删除 ${d.deleted} 行，保留 ${d.kept} 行`);
+    loadLogs();
+    if (allStatsData) loadStats();
+  } else {
+    toast(d.error || '删除失败', 'err');
+  }
+}
+
+async function deleteAllLogs() {
+  if (!confirm('确定要删除当前所有日志吗？\n此操作不可撤销！')) return;
+  const d = await apiFetch('/api/logs.php', {
+    method: 'DELETE',
+    headers: {'X-Requested-With':'XMLHttpRequest', 'X-Delete-All':'1'},
+  });
+  if (d.ok) {
+    toast('✅ 所有日志已清空');
     loadLogs();
     if (allStatsData) loadStats();
   } else {
@@ -925,9 +945,12 @@ function renderStats() {
   renderStatsPagination('ips', allIps.length, ipsLimit);
   document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => {
     const ipBanned = blacklistIpSet.has(r.ip);
+    const ipWhitelisted = !ipBanned && whitelistIpSet.has(r.ip);
     const ipBtn = ipBanned
       ? `<button class="bl-badge-btn" onclick="quickUnblockIp('${esc(r.ip)}')">黑名单</button>`
-      : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>`;
+      : ipWhitelisted
+        ? `<button class="wl-badge-btn" onclick="quickRemoveWhitelist('${esc(r.ip)}')">白名单</button>`
+        : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button><button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4)" onclick="quickWhitelistIp('${esc(r.ip)}')">白</button>`;
     return `
     <div class="top-row">
       <span class="top-rank">${ipsStart+i+1}</span>
@@ -989,7 +1012,7 @@ function renderStats() {
   document.getElementById('susp-tokens').innerHTML = suspToks.length ? suspToks.map(r => `
     <div class="top-row">
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
-        <span class="token-text" title="${esc(r.token)}">${esc(r.token.substr(0,20))}…</span>
+        <span class="token-text" title="${esc(r.token)}">${esc(r.token)}</span>
         <button class="copy-btn" data-val="${esc(r.token)}" onclick="copyText(this.dataset.val)">复制</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.ip_count} 个不同IP</span>
