@@ -135,7 +135,7 @@ https://你的域名或IP:64444/<随机路径>
 订阅请求按以下顺序过滤，通过全部拦截后才反代到机场后端：
 
 1. **黑名单**：精确 IP 封禁，`deny` 返回 444
-2. **云厂商 IP**：自动识别阿里云、腾讯云、字节、华为云、Google、AWS、Azure、DigitalOcean 等，返回 403
+2. **云厂商 IP**：自动识别Ucloud、阿里云、腾讯云、字节、华为云、Google、AWS、Azure、DigitalOcean 等，返回 403
 3. **可疑 UA**：空 UA、curl、wget、python、Go、Java 等爬虫特征，返回 403
 4. **自定义封禁 UA**：管理员在后台手动添加的 UA 关键词，返回 403
 5. **Token 黑名单**：命中封禁 Token 返回 403
