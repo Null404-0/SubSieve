@@ -244,8 +244,8 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <table>
             <thead>
               <tr>
-                <th>时间</th><th>IP</th><th>状态</th><th>Token</th>
-                <th>请求</th><th>UA</th><th>操作</th>
+                <th>时间</th><th>IP</th><th>备注</th><th>状态</th><th>Token</th>
+                <th>请求</th><th>UA</th>
               </tr>
             </thead>
             <tbody id="log-tbody"><tr><td colspan="7" class="loading">加载中…</td></tr></tbody>
@@ -527,6 +527,8 @@ let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10};
 let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1};
 let allBlEntries = [];   // 黑名单完整数据缓存
 let allWlEntries = [];   // 白名单完整数据缓存
+let wlCommentMap = {};   // ip → 白名单备注（供日志列显示）
+let blCommentMap = {};   // ip → 黑名单备注（供日志列显示）
 let uaBlLimit = 50;      // UA封禁列表显示数量
 let uaWlLimit = 50;      // UA白名单显示数量
 let allUaBlEntries = []; // UA封禁列表完整数据缓存
@@ -719,6 +721,8 @@ async function loadLogs() {
   blacklistIpSet = new Set((blData.entries || []).map(e => e.ip));
   whitelistIpSet = new Set((wlData.entries || []).map(e => e.ip));
   cloudCidrs = cloudData.cidrs || [];
+  wlCommentMap = {}; (wlData.entries || []).forEach(e => wlCommentMap[e.ip] = e.comment || '');
+  blCommentMap = {}; (blData.entries || []).forEach(e => blCommentMap[e.ip] = e.comment || '');
   if (!logsData.ok) {
     document.getElementById('log-tbody').innerHTML = '<tr><td colspan="7" class="empty">加载失败：' + esc(logsData.error||'未知错误') + '</td></tr>';
     toast('加载日志失败: ' + (logsData.error||''), 'err'); return;
@@ -792,8 +796,85 @@ function renderLogs() {
   }
 }
 
+// ── 行内备注编辑（通用）──────────────────────────────────────
+function makeCommentCell(apiPath, keyField, keyValue, comment) {
+  const d = esc(comment || '');
+  const display = d ? d : '<span style="opacity:.35">—</span>';
+  return `<td class="comment-cell" data-api="${esc(apiPath)}" data-keyf="${esc(keyField)}" data-keyv="${esc(keyValue)}" data-comment="${d}" style="color:#64748b;cursor:pointer;min-width:60px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d ? d + '（点击编辑）' : '点击添加备注'}">${display}</td>`;
+}
+
+function attachCommentCells(container) {
+  (container || document).querySelectorAll('.comment-cell').forEach(td => {
+    td.onclick = () => startEditComment(td);
+  });
+}
+
+async function startEditComment(td) {
+  if (td.querySelector('input')) return;
+  const apiPath  = td.dataset.api;
+  const keyField = td.dataset.keyf;
+  const keyValue = td.dataset.keyv;
+  const current  = td.dataset.comment || '';
+
+  const input = document.createElement('input');
+  input.type  = 'text';
+  input.value = current;
+  input.placeholder = '备注…';
+  input.style.cssText = 'width:100%;min-width:60px;background:var(--bg-input);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:2px 6px;font-size:12px;outline:none;box-sizing:border-box';
+  td.innerHTML = '';
+  td.appendChild(input);
+  input.focus(); input.select();
+
+  let saved = false;
+  async function doSave() {
+    if (saved) return; saved = true;
+    const newComment = input.value.trim();
+    if (newComment === current) { doRestore(current); return; }
+    const body = {comment: newComment};
+    body[keyField] = keyValue;
+    const d = await apiFetch(apiPath, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      headers: {'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    });
+    if (d.ok) {
+      td.dataset.comment = newComment;
+      // 同步更新全局缓存
+      if (apiPath === '/api/whitelist.php') {
+        wlCommentMap[keyValue] = newComment;
+        const e = allWlEntries.find(e => e.ip === keyValue); if (e) e.comment = newComment;
+      } else if (apiPath === '/api/blacklist.php') {
+        blCommentMap[keyValue] = newComment;
+        const e = allBlEntries.find(e => e.ip === keyValue); if (e) e.comment = newComment;
+      } else if (apiPath === '/api/ua_blacklist.php') {
+        const e = allUaBlEntries.find(e => e.ua === keyValue); if (e) e.comment = newComment;
+      } else if (apiPath === '/api/ua_whitelist.php') {
+        const e = allUaWlEntries.find(e => e.ua === keyValue); if (e) e.comment = newComment;
+      }
+      doRestore(newComment);
+      toast('✅ 备注已更新');
+    } else {
+      toast(d.error || '更新失败', 'err');
+      doRestore(current);
+    }
+  }
+  function doRestore(c) {
+    const d2 = esc(c);
+    td.innerHTML = d2 ? d2 : '<span style="opacity:.35">—</span>';
+    td.title = d2 ? d2 + '（点击编辑）' : '点击添加备注';
+    td.style.cursor = 'pointer';
+    td.onclick = () => startEditComment(td);
+  }
+  input.addEventListener('blur', doSave);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { saved = true; doRestore(current); }
+  });
+}
+
 function renderLogRows(rows) {
-  document.getElementById('log-tbody').innerHTML = rows.map(l => {
+  const tbody = document.getElementById('log-tbody');
+  tbody.innerHTML = rows.map(l => {
     const isBlacklisted = blacklistIpSet.has(l.ip);
     const isWhitelisted = !isBlacklisted && whitelistIpSet.has(l.ip);
     const isCloud = !isBlacklisted && !isWhitelisted && isCloudIp(l.ip);
@@ -807,17 +888,24 @@ function renderLogRows(rows) {
     const tokenHtml = l.token
       ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
+    // 备注列：从白名单/黑名单备注映射获取，支持行内编辑
+    const commentCell = isWhitelisted
+      ? makeCommentCell('/api/whitelist.php', 'ip', l.ip, wlCommentMap[l.ip] || '')
+      : isBlacklisted
+        ? makeCommentCell('/api/blacklist.php', 'ip', l.ip, blCommentMap[l.ip] || '')
+        : `<td style="color:#475569;opacity:.4;font-size:11px">—</td>`;
     return `
     <tr>
       <td style="white-space:nowrap;color:#64748b;font-size:11px">${esc(l.time)}</td>
       <td class="ip-cell"><div style="display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap"><span>${esc(l.ip)}</span><button class="copy-btn" data-val="${esc(l.ip)}" onclick="copyText(this.dataset.val)">复制</button><span style="display:inline-block;width:2px"></span>${ipBtn}</div></td>
+      ${commentCell}
       <td>${statusBadge(l.status)}</td>
       <td style="min-width:100px;max-width:200px">${tokenHtml}</td>
       <td><div class="req-cell-wrap"><span class="req-cell" title="${esc(l.request)}">${esc(l.request)}</span><button class="copy-btn" data-val="${esc(l.request)}" onclick="copyText(this.dataset.val)">复制</button></div></td>
       <td><div class="ua-cell-wrap"><span class="ua-cell" title="${esc(l.ua)}">${esc(l.ua)||'—'}</span>${l.ua ? `<button class="copy-btn" data-val="${esc(l.ua)}" onclick="copyText(this.dataset.val)">复制</button>` : ''}</div></td>
-      <td></td>
     </tr>`;
   }).join('');
+  attachCommentCells(tbody);
 }
 
 async function deleteLogs() {
@@ -1125,16 +1213,18 @@ function renderUaBlacklist() {
     document.getElementById('ua-list').innerHTML = '<div class="empty">封禁列表为空</div>';
     return;
   }
-  document.getElementById('ua-list').innerHTML = `
+  const uaListEl = document.getElementById('ua-list');
+  uaListEl.innerHTML = `
     <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
         <td class="ip-cell">${esc(e.ua)}</td>
-        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
+        ${makeCommentCell('/api/ua_blacklist.php', 'ua', e.ua, e.comment||'')}
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="uaDel('${esc(e.ua)}')">移除</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+  attachCommentCells(uaListEl);
 }
 
 function renderUaWhitelist() {
@@ -1143,16 +1233,18 @@ function renderUaWhitelist() {
     document.getElementById('ua-wl-list').innerHTML = '<div class="empty">白名单为空</div>';
     return;
   }
-  document.getElementById('ua-wl-list').innerHTML = `
+  const uaWlListEl = document.getElementById('ua-wl-list');
+  uaWlListEl.innerHTML = `
     <table><thead><tr><th>UA 关键词</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
     <tbody>${entries.map(e => `
       <tr>
         <td class="ip-cell">${esc(e.ua)}</td>
-        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
+        ${makeCommentCell('/api/ua_whitelist.php', 'ua', e.ua, e.comment||'')}
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="uaWlDel('${esc(e.ua)}')">移除</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+  attachCommentCells(uaWlListEl);
 }
 
 async function uaAdd() {
@@ -1243,10 +1335,11 @@ async function loadWhitelist() {
       <tr>
         <td><input type="checkbox" class="wl-check" value="${esc(e.ip)}"></td>
         <td class="ip-cell">${esc(e.ip)}</td>
-        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
+        ${makeCommentCell('/api/whitelist.php', 'ip', e.ip, e.comment||'')}
         <td><button class="btn-danger" onclick="wlDel('${esc(e.ip)}')">删除</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+  attachCommentCells(document.getElementById('wl-list'));
 }
 
 function exportWhitelist() {
@@ -1372,7 +1465,7 @@ async function loadBlacklist() {
       <tr>
         <td><input type="checkbox" class="bl-check" value="${esc(e.ip)}"></td>
         <td class="ip-cell">${esc(e.ip)}</td>
-        <td style="color:#64748b">${esc(e.comment)||'—'}</td>
+        ${makeCommentCell('/api/blacklist.php', 'ip', e.ip, e.comment||'')}
         <td style="color:#64748b;font-size:11px">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" onclick="blDel('${esc(e.ip)}')">解封</button></td>
       </tr>`).join('')}
@@ -1395,6 +1488,7 @@ async function loadBlacklist() {
   }
 
   document.getElementById('bl-list').innerHTML = html;
+  attachCommentCells(document.getElementById('bl-list'));
 }
 
 function toggleAllBl(cb) {
@@ -1505,12 +1599,13 @@ async function loadTokenBlacklist() {
       return `<tr>
         <td style="font-family:monospace;font-size:12px" title="${esc(tok)}">${esc(tokDisplay)}<button class="copy-btn" data-val="${esc(tok)}" onclick="copyText(this.dataset.val)" style="margin-left:4px">复制</button></td>
         <td>${pullsHtml}</td>
-        <td style="color:#94a3b8;font-size:12px">${esc(e.comment||'')}</td>
+        ${makeCommentCell('/api/token_blacklist.php', 'token', tok, e.comment||'')}
         <td style="color:#64748b;font-size:11px;white-space:nowrap">${esc(e.added_at||'')}</td>
         <td><button class="btn-danger" style="font-size:12px;padding:2px 8px" onclick="tbDel('${esc(tok)}')">移除</button></td>
       </tr>`;
     }).join('')}
     </tbody></table>`;
+  attachCommentCells(document.getElementById('tb-list'));
 }
 
 async function tbAdd() {

@@ -68,6 +68,26 @@ if ($method === 'POST') {
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
 
+// PATCH — 更新备注（仅更新 JSON，不 reload nginx）
+if ($method === 'PATCH') {
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $ip      = trim($body['ip'] ?? '');
+    $comment = trim($body['comment'] ?? '');
+
+    if (!$ip) json_err('缺少 ip 参数');
+
+    $entries = read_blacklist();
+    $found   = false;
+    foreach ($entries as &$e) {
+        if ($e['ip'] === $ip) { $e['comment'] = $comment; $found = true; break; }
+    }
+    unset($e);
+
+    if (!$found) json_err('未找到该IP');
+    file_put_contents(BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    json_out(['ok' => true]);
+}
+
 // DELETE — 移除并立即生效（支持单个 ip 或批量 ips 数组）
 if ($method === 'DELETE') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];

@@ -52,6 +52,37 @@ if ($method === 'POST') {
     json_out(['ok' => true]);
 }
 
+// PATCH — 更新备注
+if ($method === 'PATCH') {
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $ip      = trim($body['ip'] ?? '');
+    $comment = trim($body['comment'] ?? '');
+
+    if (!$ip) json_err('缺少 ip 参数');
+    if (!file_exists(WHITELIST_IPS)) json_err('白名单文件不存在');
+
+    $lines = file(WHITELIST_IPS, FILE_IGNORE_NEW_LINES);
+    $found = false;
+    $new   = [];
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+            $new[] = $line;
+            continue;
+        }
+        if (preg_match('/^(\S+)/', $trimmed, $m) && $m[1] === $ip) {
+            $new[] = $ip . ($comment ? "  # $comment" : '');
+            $found = true;
+        } else {
+            $new[] = $line;
+        }
+    }
+
+    if (!$found) json_err('未找到该IP');
+    file_put_contents(WHITELIST_IPS, implode("\n", $new) . "\n", LOCK_EX);
+    json_out(['ok' => true]);
+}
+
 // DELETE — 删除条目（支持单个 ip 或批量 ips 数组）
 if ($method === 'DELETE') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
