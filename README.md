@@ -53,9 +53,10 @@ sgw/
 
 ### 前置要求
 
-- 一台有公网 IP 的 VPS（Linux）
+- 一台有公网 IP 的 VPS（Debian/Ubuntu 最低1c0.5g）
 - 已安装 Docker + Docker Compose
 - 如需自动申请 SSL 证书：提前把域名解析到本机（A 记录），且 **80 端口未被占用**
+- 不要装其他任何玩意儿
 
 ### 一键部署
 
@@ -77,6 +78,16 @@ chmod +x setup.sh
 | 域名（SSL） | 输入已解析到本机的域名，脚本自动调用 acme.sh 申请证书；留空则手动放证书 |
 
 部署完成后，访问信息会打印在终端，同时保存到 `DEPLOY_INFO.txt`。
+## 食用方法
+部署完成后，将原订阅链接中的域名和端口替换为部署了本项目的域名和端口即可。
+
+示例：
+# 原订阅链接
+https://aaaa.bbbb.com:11111/api/v1/client/subscribe?token=xxxxxxxxxxxxxxxxxxxxxxx
+
+# 替换为
+https://your-domain.com:端口/api/v1/client/subscribe?token=xxxxxxxxxxxxxxxxxxxxxxx
+
 
 ---
 
