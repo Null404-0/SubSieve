@@ -28,7 +28,7 @@ if (file_exists(SETTINGS_JSON)) {
 
 define('ADMIN_USER',        $_sg['admin_user']      ?? (getenv('ADMIN_USER')        ?: 'admin'));
 define('ADMIN_PASS',        $_sg['admin_pass']      ?? (getenv('ADMIN_PASS')        ?: ''));
-define('GATEWAY_CONTAINER', getenv('GATEWAY_CONTAINER') ?: 'subscribe-gateway');
+define('NGINX_RELOAD_SIGNAL', '/etc/nginx/subscribe/.reload');
 define('SESSION_LIFETIME',  (int)(getenv('SESSION_LIFETIME') ?: 28800)); // 8小时
 // 后台访问路径前缀，留空则不校验（例如 ef9d1566 → 必须访问 /ef9d1566 才能进入后台）
 define('ADMIN_SECRET_PATH', trim(trim(getenv('ADMIN_SECRET_PATH') ?: ''), '/'));
@@ -51,22 +51,12 @@ function json_err(string $msg, int $code = 400): void {
 }
 
 /**
- * 在 gateway 容器内执行命令（通过 docker exec）
- */
-function gateway_exec(string $cmd): array {
-    $container = escapeshellarg(GATEWAY_CONTAINER);
-    $full = "docker exec $container sh -c " . escapeshellarg($cmd) . " 2>&1";
-    $output = shell_exec($full);
-    return ['output' => trim($output ?? '')];
-}
-
-/**
  * 触发 gateway nginx reload
+ * 向共享 volume 写入信号文件，gateway 的 watcher 检测后执行 nginx -s reload
+ * 无需挂载 Docker socket，避免宿主机 root 权限暴露
  */
 function nginx_reload(): bool {
-    $result = gateway_exec('nginx -t && nginx -s reload');
-    return str_contains($result['output'], 'successful') ||
-           str_contains($result['output'], 'signal process started');
+    return file_put_contents(NGINX_RELOAD_SIGNAL, '1', LOCK_EX) !== false;
 }
 
 // ── V2B 数据库接口（预留，后续填充）─────────────────────────

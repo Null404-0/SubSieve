@@ -27,12 +27,10 @@ services:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASS=${ADMIN_PASS}
       - ADMIN_SECRET_PATH=${ADMIN_SECRET_PATH}
-      - GATEWAY_CONTAINER=subscribe-gateway
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
       - gw_config:/etc/nginx/subscribe
       - gw_logs:/var/log/subscribe
-      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   gw_config:
