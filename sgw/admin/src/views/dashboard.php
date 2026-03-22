@@ -869,18 +869,24 @@ function renderStats() {
   const ips = ipsLimit > 0 ? allIps.slice((ipsPage-1)*ipsLimit, ipsPage*ipsLimit) : allIps;
   const ipsStart = ipsLimit > 0 ? (ipsPage-1)*ipsLimit : 0;
   renderStatsPagination('ips', allIps.length, ipsLimit);
-  document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => `
+  document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => {
+    const ipBanned = blacklistIpSet.has(r.ip);
+    const ipBtn = ipBanned
+      ? `<button class="bl-badge-btn" onclick="quickUnblockIp('${esc(r.ip)}')">黑名单</button>`
+      : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>`;
+    return `
     <div class="top-row">
       <span class="top-rank">${ipsStart+i+1}</span>
       <span class="top-val">
         ${esc(r.ip)}
-        <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
+        ${ipBtn}
       </span>
       <span class="top-count">${r.total}次</span>
       <span class="top-sub" style="margin-left:8px;font-size:11px" title="成功200 / 拦截403 / 限速429 / 断连444（非订阅路径或HTTP明文）">
         <span style="color:#22c55e">${r.s200}</span>/<span style="color:#ef4444">${r.s403}</span>/<span style="color:#eab308">${r.s429}</span>/<span style="color:#64748b">${r.s444}</span>
       </span>
-    </div>`).join('') : '<div class="empty">暂无数据</div>';
+    </div>`;
+  }).join('') : '<div class="empty">暂无数据</div>';
 
   // Top Token
   const allToks = data.top_tokens || [];
@@ -937,14 +943,20 @@ function renderStats() {
   const suspIpsPage  = statsPages.suspIps;
   const suspIps = suspIpsLimit > 0 ? allSuspIps.slice((suspIpsPage-1)*suspIpsLimit, suspIpsPage*suspIpsLimit) : allSuspIps;
   renderStatsPagination('suspIps', allSuspIps.length, suspIpsLimit);
-  document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => `
+  document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => {
+    const suspBanned = blacklistIpSet.has(r.ip);
+    const suspBtn = suspBanned
+      ? `<button class="bl-badge-btn" onclick="quickUnblockIp('${esc(r.ip)}')">黑名单</button>`
+      : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>`;
+    return `
     <div class="top-row">
       <span class="top-val">${esc(r.ip)}
-        <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
+        ${suspBtn}
         <button class="add-btn-sm" style="background:#22c55e;margin-left:4px" onclick="quickWhitelistIp('${esc(r.ip)}')">白</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token</span>
-    </div>`).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
+    </div>`;
+  }).join('') : '<div class="empty">暂无可疑IP（阈值：拉取3个以上不同Token）</div>';
 }
 
 // ── 从分析页加入白名单（不要求先在黑名单）──────────────────────
@@ -963,6 +975,22 @@ async function quickWhitelistIp(ip) {
     }
   } else {
     toast(d.error || '加入白名单失败', 'err');
+  }
+}
+
+// ── 从分析页解封 IP（仅移除黑名单，不加白名单）────────────────────
+async function quickUnblockIp(ip) {
+  if (!confirm(`是否解封 ${ip}？`)) return;
+  const d = await apiFetch('/api/blacklist.php', {
+    method:'DELETE', body:JSON.stringify({ip}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast(`✅ ${ip} 已解封`);
+    blacklistIpSet.delete(ip);
+    renderStats();
+  } else {
+    toast(d.error || '解封失败', 'err');
   }
 }
 
@@ -1462,8 +1490,12 @@ async function quickBlacklist(ip) {
     method:'POST', body:JSON.stringify({ip, comment: cmt}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) { toast(`✅ ${ip} 已封禁`); TABS[currentTab].loader(); }
-  else toast(d.error||'封禁失败','err');
+  if (d.ok) {
+    toast(`✅ ${ip} 已封禁`);
+    blacklistIpSet.add(ip);
+    if (currentTab === 'stats') renderStats();
+    else TABS[currentTab].loader();
+  } else toast(d.error||'封禁失败','err');
 }
 
 // ── 导出日志 ──────────────────────────────────────────────────
