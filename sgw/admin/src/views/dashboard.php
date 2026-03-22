@@ -15,6 +15,19 @@ if ((empty($_preSg['upstream_url']) || empty($_preSg['subscribe_path'])) && file
             $_preSg['subscribe_path'] = $_m[1];
     }
 }
+// 分离 upstream_url 中的端口，用于端口输入框单独显示
+$_preSgPort = 443;
+$_preSgUrlClean = $_preSg['upstream_url'] ?? '';
+if (!empty($_preSg['upstream_url'])) {
+    $_p = parse_url($_preSg['upstream_url']);
+    $_scheme = $_p['scheme'] ?? 'https';
+    if (isset($_p['port'])) {
+        $_preSgPort = $_p['port'];
+        $_preSgUrlClean = $_scheme . '://' . ($_p['host'] ?? '');
+    } else {
+        $_preSgPort = ($_scheme === 'http') ? 80 : 443;
+    }
+}
 function _val(string $v): string { return htmlspecialchars($v, ENT_QUOTES); }
 ?>
 <!DOCTYPE html>
@@ -480,9 +493,15 @@ tr:hover td{background:rgba(99,102,241,.04)}
         <div class="card">
           <div class="card-title">机场（反代目标）</div>
           <div style="display:flex;flex-direction:column;gap:12px">
-            <div>
-              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址（如 https://panel.yourdomain.com）</label>
-              <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSg['upstream_url'] ?? '') ?>" style="width:100%">
+            <div style="display:flex;gap:8px;align-items:flex-end">
+              <div style="flex:1;min-width:0">
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址</label>
+                <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSgUrlClean) ?>" style="width:100%">
+              </div>
+              <div style="width:90px;flex-shrink:0">
+                <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">端口</label>
+                <input class="ip-input" id="cfg-upstream-port" type="number" min="1" max="65535" placeholder="443" value="<?= _val((string)$_preSgPort) ?>" style="width:100%">
+              </div>
             </div>
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">订阅路径</label>
@@ -1663,8 +1682,18 @@ async function loadSettings() {
   document.getElementById('cfg-admin-user').value   = currentSettings.admin_user || '';
   document.getElementById('cfg-new-pass').value     = '';
   document.getElementById('cfg-confirm-pass').value = '';
-  // 填充上游设置
-  document.getElementById('cfg-upstream-url').value    = currentSettings.upstream_url || '';
+  // 填充上游设置（分离 URL 和端口）
+  const _rawUrl = currentSettings.upstream_url || '';
+  let _displayUrl = _rawUrl, _displayPort = 443;
+  if (_rawUrl) {
+    try {
+      const _u = new URL(_rawUrl.match(/^https?:\/\//) ? _rawUrl : 'https://' + _rawUrl);
+      _displayPort = _u.port ? parseInt(_u.port, 10) : (_u.protocol === 'https:' ? 443 : 80);
+      _displayUrl  = _u.protocol + '//' + _u.hostname;
+    } catch(e) {}
+  }
+  document.getElementById('cfg-upstream-url').value    = _displayUrl;
+  document.getElementById('cfg-upstream-port').value   = _displayPort;
   document.getElementById('cfg-subscribe-path').value  = currentSettings.subscribe_path || '';
   // 显示证书信息
   const cert = data.cert || {};
@@ -1722,11 +1751,26 @@ async function saveCredSettings() {
 }
 
 async function saveUpstreamSettings() {
-  const url  = document.getElementById('cfg-upstream-url').value.trim();
-  const path = document.getElementById('cfg-subscribe-path').value.trim();
-  if (!url && !path) { toast('请填写机场地址或订阅路径', 'err'); return; }
+  let urlRaw   = document.getElementById('cfg-upstream-url').value.trim();
+  const path   = document.getElementById('cfg-subscribe-path').value.trim();
+  const portStr= document.getElementById('cfg-upstream-port').value.trim();
+  if (!urlRaw && !path) { toast('请填写机场地址或订阅路径', 'err'); return; }
   const body = {};
-  if (url) body.upstream_url = url;
+  if (urlRaw) {
+    let url = urlRaw.match(/^https?:\/\//) ? urlRaw : 'https://' + urlRaw;
+    if (portStr !== '') {
+      const port = parseInt(portStr, 10);
+      if (isNaN(port) || port < 1 || port > 65535) { toast('端口号无效（1-65535）', 'err'); return; }
+      try {
+        const u = new URL(url);
+        const defaultPort = u.protocol === 'https:' ? 443 : 80;
+        u.port = (port !== defaultPort) ? String(port) : '';
+        body.upstream_url = u.protocol + '//' + u.host;
+      } catch(e) { body.upstream_url = url; }
+    } else {
+      body.upstream_url = url;
+    }
+  }
   if (path) body.subscribe_path = path;
   const d = await apiFetch('/api/settings.php', {
     method: 'POST', body: JSON.stringify(body),
