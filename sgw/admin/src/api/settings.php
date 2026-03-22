@@ -5,25 +5,21 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // GET — 读取当前设置
 if ($method === 'GET') {
-    // 读取 DEPLOY_INFO.txt 内容
-    if (!empty($_GET['deploy_info'])) {
-        $content = file_exists(DEPLOY_INFO_FILE) ? file_get_contents(DEPLOY_INFO_FILE) : '';
-        json_out(['ok' => true, 'content' => $content ?: '']);
-    }
-
-    $s = read_settings();
-    // 读取证书信息
-    $certInfo = get_cert_info();
-    // 从 protect.conf 读取当前上游配置（若 settings.json 未记录则解析 conf 文件）
-    if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
-        $parsed = parse_protect_conf();
-        if ($parsed) {
-            $s['upstream_url']   = $s['upstream_url']   ?? $parsed['upstream_url'];
-            $s['upstream_host']  = $s['upstream_host']  ?? $parsed['upstream_host'];
-            $s['subscribe_path'] = $s['subscribe_path'] ?? $parsed['subscribe_path'];
+    try {
+        $s = read_settings();
+        $certInfo = get_cert_info();
+        if (empty($s['upstream_url']) || empty($s['subscribe_path'])) {
+            $parsed = parse_protect_conf();
+            if ($parsed) {
+                $s['upstream_url']   = $s['upstream_url']   ?? $parsed['upstream_url'];
+                $s['upstream_host']  = $s['upstream_host']  ?? $parsed['upstream_host'];
+                $s['subscribe_path'] = $s['subscribe_path'] ?? $parsed['subscribe_path'];
+            }
         }
+        json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo]);
+    } catch (Throwable $e) {
+        json_err('PHP错误: ' . $e->getMessage());
     }
-    json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo]);
 }
 
 // POST — 保存设置
@@ -112,7 +108,9 @@ json_err('不支持的请求方式', 405);
 
 function read_settings(): array {
     if (!file_exists(SETTINGS_JSON)) return [];
-    $data = json_decode(file_get_contents(SETTINGS_JSON), true);
+    $raw = @file_get_contents(SETTINGS_JSON);
+    if ($raw === false) return [];
+    $data = json_decode($raw, true);
     return is_array($data) ? $data : [];
 }
 
@@ -165,7 +163,8 @@ NGINX;
  */
 function parse_protect_conf(): ?array {
     if (!file_exists(PROTECT_CONF)) return null;
-    $content = file_get_contents(PROTECT_CONF);
+    $content = @file_get_contents(PROTECT_CONF);
+    if ($content === false) return null;
     $result = [];
     if (preg_match('/^location\s+\^~\s+(\S+)/m', $content, $m)) {
         $result['subscribe_path'] = $m[1];

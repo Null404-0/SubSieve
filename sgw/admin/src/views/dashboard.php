@@ -478,15 +478,6 @@ tr:hover td{background:rgba(99,102,241,.04)}
           </div>
         </div>
 
-        <!-- 部署信息 -->
-        <div class="card">
-          <div class="card-title">部署信息 (DEPLOY_INFO.txt)</div>
-          <pre id="deploy-info-content" style="font-size:11px;color:var(--text2);background:var(--bg);padding:12px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;min-height:80px">加载中…</pre>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="mode-btn import-btn" onclick="syncDeployInfo()">同步更新</button>
-            <button class="mode-btn import-btn" onclick="downloadDeployInfo()">下载</button>
-          </div>
-        </div>
 
       </div>
     </div>
@@ -1375,10 +1366,7 @@ async function importBlacklist(input) {
 let currentSettings = {};
 
 async function loadSettings() {
-  const [data] = await Promise.all([
-    apiFetch('/api/settings.php'),
-    loadDeployInfo(),
-  ]);
+  const data = await apiFetch('/api/settings.php');
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
   currentSettings = data.settings || {};
   // 填充界面设置
@@ -1411,15 +1399,6 @@ async function loadSettings() {
   }
 }
 
-async function loadDeployInfo() {
-  const r = await apiFetch('/api/settings.php?deploy_info=1');
-  const el = document.getElementById('deploy-info-content');
-  if (r.ok && r.content) {
-    el.textContent = r.content;
-  } else {
-    el.textContent = '（尚未生成，点击"同步更新"创建）';
-  }
-}
 
 async function saveTitleSettings() {
   const d = await apiFetch('/api/settings.php', {
@@ -1474,25 +1453,6 @@ async function saveUpstreamSettings() {
   }
 }
 
-async function syncDeployInfo() {
-  const d = await apiFetch('/api/settings.php', {
-    method: 'POST', body: JSON.stringify({_sync_deploy: true}),
-    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-  });
-  if (d.ok) { toast('✅ 部署信息已更新'); loadDeployInfo(); }
-  else toast(d.error || '同步失败', 'err');
-}
-
-function downloadDeployInfo() {
-  const content = document.getElementById('deploy-info-content').textContent;
-  if (!content || content.includes('尚未生成')) { toast('请先点击"同步更新"', 'err'); return; }
-  const blob = new Blob([content], {type: 'text/plain'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'DEPLOY_INFO.txt';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
 
 // ── 快捷封禁 IP（从日志/分析页直接封） ──────────────────────────
 async function quickBlacklist(ip) {
