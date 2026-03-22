@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SubSieve Admin</title>
+<title><?= htmlspecialchars(PAGE_TITLE, ENT_QUOTES) ?></title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -144,7 +144,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
 <body>
 
 <nav class="sidebar">
-  <div class="logo">Sub<span>Sieve</span></div>
+  <div class="logo"><?= htmlspecialchars(SITE_TITLE, ENT_QUOTES) ?></div>
   <button class="nav-item active" onclick="switchTab('logs',this)">
     <span class="nav-icon">📋</span>日志
   </button>
@@ -159,6 +159,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
   </button>
   <button class="nav-item" onclick="switchTab('blacklist',this)">
     <span class="nav-icon">🚫</span>黑名单
+  </button>
+  <button class="nav-item" onclick="switchTab('settings',this)">
+    <span class="nav-icon">⚙</span>系统设置
   </button>
   <div class="sidebar-bottom">
     <a href="<?= ADMIN_SECRET_PATH !== '' ? '/' . ADMIN_SECRET_PATH . '/logout' : '/logout' ?>" style="text-decoration:none">
@@ -237,7 +240,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
     <div class="tab-panel" id="panel-stats">
       <div class="stats-grid">
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div class="card-title" style="margin-bottom:0">今日 Top IP</div>
             <div style="display:flex;gap:4px">
               <button class="mode-btn active" id="stats-ips-10" onclick="setStatsLimit('ips',10)">10</button>
@@ -246,7 +249,11 @@ tr:hover td{background:rgba(99,102,241,.04)}
               <button class="mode-btn" id="stats-ips-0" onclick="setStatsLimit('ips',0)">全部</button>
             </div>
           </div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:10px">
+            右侧计数：<span style="color:#22c55e">●</span>成功 / <span style="color:#ef4444">●</span>拦截403 / <span style="color:#eab308">●</span>限速429 / <span style="color:#64748b">●</span>断连444
+          </div>
           <div id="top-ips"><div class="loading">加载中…</div></div>
+          <div id="stats-ips-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -259,6 +266,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </div>
           </div>
           <div id="top-tokens"><div class="loading">加载中…</div></div>
+          <div id="stats-tokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -271,6 +279,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </div>
           </div>
           <div id="susp-tokens"><div class="loading">加载中…</div></div>
+          <div id="stats-suspTokens-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -283,6 +292,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </div>
           </div>
           <div id="susp-ips"><div class="loading">加载中…</div></div>
+          <div id="stats-suspIps-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -295,6 +305,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
             </div>
           </div>
           <div id="bad-uas"><div class="loading">加载中…</div></div>
+          <div id="stats-uas-pg" class="page-controls" style="display:none;margin-top:10px"></div>
         </div>
       </div>
     </div>
@@ -353,6 +364,9 @@ tr:hover td{background:rgba(99,102,241,.04)}
         <div class="apply-row">
           <button class="btn-apply" onclick="wlApply()">▶ 生效（reload nginx）</button>
           <span class="apply-hint">添加后需点击"生效"才会应用到拦截规则</span>
+          <button class="mode-btn import-btn" onclick="exportWhitelist()" style="margin-left:auto">导出</button>
+          <button class="mode-btn import-btn" onclick="document.getElementById('wl-import-file').click()">导入</button>
+          <input type="file" id="wl-import-file" accept=".txt,.conf" style="display:none" onchange="importWhitelist(this)">
         </div>
         <div id="wl-list"><div class="loading">加载中…</div></div>
       </div>
@@ -366,11 +380,95 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <input class="ip-input" id="bl-ip" placeholder="1.2.3.4 或 1.2.3.0/24">
           <input class="comment-input" id="bl-comment" placeholder="备注（可选）">
           <button class="btn-primary" onclick="blAdd()">添加并立即生效</button>
+          <button class="mode-btn import-btn" onclick="exportBlacklist()">导出</button>
+          <button class="mode-btn import-btn" onclick="document.getElementById('bl-import-file').click()">导入</button>
+          <input type="file" id="bl-import-file" accept=".txt,.conf" style="display:none" onchange="importBlacklist(this)">
         </div>
         <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
-          ⚡ 黑名单添加后立即 reload nginx 生效，无需额外操作
+          ⚡ 黑名单添加后立即 reload nginx 生效，无需额外操作。导入支持 IP/CIDR 格式（每行一条），自动去重。
         </div>
         <div id="bl-list"><div class="loading">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- ─── 系统设置 ───────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-settings">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+
+        <!-- 界面设置 -->
+        <div class="card">
+          <div class="card-title">界面设置</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网站标题（左上角 Logo）</label>
+              <input class="ip-input" id="cfg-site-title" placeholder="SubSieve" style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网页标题（浏览器 Tab）</label>
+              <input class="ip-input" id="cfg-page-title" placeholder="SubSieve Admin" style="width:100%">
+            </div>
+            <button class="btn-primary" onclick="saveTitleSettings()">保存标题设置</button>
+          </div>
+        </div>
+
+        <!-- 管理员凭证 -->
+        <div class="card">
+          <div class="card-title">登录凭证</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">用户名</label>
+              <input class="ip-input" id="cfg-admin-user" placeholder="admin" style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">新密码</label>
+              <input class="ip-input" id="cfg-new-pass" type="password" placeholder="留空则不修改" style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">确认新密码</label>
+              <input class="ip-input" id="cfg-confirm-pass" type="password" placeholder="再次输入新密码" style="width:100%">
+            </div>
+            <div class="apply-hint" style="color:#eab308">⚠️ 修改后需重新登录，请牢记新密码</div>
+            <button class="btn-primary" onclick="saveCredSettings()">保存凭证设置</button>
+          </div>
+        </div>
+
+        <!-- 机场（上游）配置 -->
+        <div class="card">
+          <div class="card-title">机场（反代目标）</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址（如 https://panel.yourdomain.com）</label>
+              <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" style="width:100%">
+            </div>
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">订阅路径</label>
+              <input class="ip-input" id="cfg-subscribe-path" placeholder="/api/v1/client/subscribe" style="width:100%">
+            </div>
+            <div class="apply-hint" style="color:#eab308">⚡ 保存后立即更新 nginx 配置并 reload</div>
+            <button class="btn-primary" onclick="saveUpstreamSettings()">保存并立即生效</button>
+          </div>
+        </div>
+
+        <!-- SSL 证书信息 -->
+        <div class="card">
+          <div class="card-title">SSL 证书</div>
+          <div id="cert-info"><div class="loading">加载中…</div></div>
+          <div class="apply-hint" style="margin-top:12px;color:var(--text3)">
+            证书文件位置：<code style="font-size:11px;background:var(--bg);padding:2px 5px;border-radius:3px">/etc/nginx/ssl/cert.pem</code><br>
+            如需更换证书，请替换宿主机 <code style="font-size:11px;background:var(--bg);padding:2px 5px;border-radius:3px">sgw/ssl/</code> 目录下的文件后重启容器
+          </div>
+        </div>
+
+        <!-- 部署信息 -->
+        <div class="card">
+          <div class="card-title">部署信息 (DEPLOY_INFO.txt)</div>
+          <pre id="deploy-info-content" style="font-size:11px;color:var(--text2);background:var(--bg);padding:12px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;min-height:80px">加载中…</pre>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="mode-btn import-btn" onclick="syncDeployInfo()">同步更新</button>
+            <button class="mode-btn import-btn" onclick="downloadDeployInfo()">下载</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -390,6 +488,9 @@ let blacklistIpSet = new Set();
 let cloudCidrs = [];     // 云服务商CIDR列表，用于检测云IP
 let allStatsData = null; // 完整统计数据缓存
 let statsLimits = {ips: 10, tokens: 10, uas: 10, suspTokens: 10, suspIps: 10};
+let statsPages  = {ips:  1, tokens:  1, uas:  1, suspTokens:  1, suspIps:  1};
+let allBlEntries = [];   // 黑名单完整数据缓存
+let allWlEntries = [];   // 白名单完整数据缓存
 let uaBlLimit = 50;      // UA封禁列表显示数量
 let uaWlLimit = 50;      // UA白名单显示数量
 let allUaBlEntries = []; // UA封禁列表完整数据缓存
@@ -431,6 +532,7 @@ const TABS = {
   ua_blacklist: {title:'UA',     loader:loadUaBlacklist},
   whitelist:    {title:'白名单', loader:loadWhitelist},
   blacklist:    {title:'黑名单', loader:loadBlacklist},
+  settings:     {title:'系统设置', loader:loadSettings},
 };
 let currentTab = 'logs';
 
@@ -719,8 +821,7 @@ async function loadStats() {
 
 function setStatsLimit(key, n) {
   statsLimits[key] = n;
-  // 更新按钮样式
-  const map = {ips:'ips', tokens:'tokens', uas:'uas', suspTokens:'suspTokens', suspIps:'suspIps'};
+  statsPages[key] = 1;  // 切换每页数量时重置到第1页
   [10, 25, 50, 0].forEach(v => {
     const btn = document.getElementById(`stats-${key}-${v}`);
     if (btn) btn.classList.toggle('active', v === n);
@@ -728,32 +829,59 @@ function setStatsLimit(key, n) {
   renderStats();
 }
 
+function changeStatsPage(key, delta) {
+  statsPages[key] += delta;
+  renderStats();
+}
+
+function renderStatsPagination(key, total, pageSize) {
+  const el = document.getElementById(`stats-${key}-pg`);
+  if (!el) return;
+  if (pageSize === 0 || total <= pageSize) { el.style.display = 'none'; return; }
+  const totalPages = Math.ceil(total / pageSize);
+  statsPages[key] = Math.max(1, Math.min(statsPages[key], totalPages));
+  const p = statsPages[key];
+  el.style.display = 'flex';
+  el.innerHTML = `
+    <button class="mode-btn" onclick="changeStatsPage('${key}',-1)" ${p<=1?'disabled':''}>上一页</button>
+    <span style="color:var(--text2);font-size:12px;white-space:nowrap;padding:0 6px">第 ${p} / ${totalPages} 页（共 ${total} 条）</span>
+    <button class="mode-btn" onclick="changeStatsPage('${key}',1)" ${p>=totalPages?'disabled':''}>下一页</button>`;
+}
+
 function renderStats() {
   if (!allStatsData) return;
   const data = allStatsData;
 
   // Top IP
-  const ips = statsLimits.ips > 0 ? (data.top_ips||[]).slice(0, statsLimits.ips) : (data.top_ips||[]);
+  const allIps = data.top_ips || [];
+  const ipsLimit = statsLimits.ips;
+  const ipsPage  = statsPages.ips;
+  const ips = ipsLimit > 0 ? allIps.slice((ipsPage-1)*ipsLimit, ipsPage*ipsLimit) : allIps;
+  const ipsStart = ipsLimit > 0 ? (ipsPage-1)*ipsLimit : 0;
+  renderStatsPagination('ips', allIps.length, ipsLimit);
   document.getElementById('top-ips').innerHTML = ips.length ? ips.map((r,i) => `
     <div class="top-row">
-      <span class="top-rank">${i+1}</span>
+      <span class="top-rank">${ipsStart+i+1}</span>
       <span class="top-val">
         ${esc(r.ip)}
         <button class="add-btn-sm" onclick="quickBlacklist('${esc(r.ip)}')">封</button>
       </span>
       <span class="top-count">${r.total}次</span>
-      <span class="top-sub" style="margin-left:8px;font-size:11px">
-        <span style="color:#22c55e">${r.s200}</span>/
-        <span style="color:#ef4444">${r.s403}</span>/
-        <span style="color:#eab308">${r.s429}</span>
+      <span class="top-sub" style="margin-left:8px;font-size:11px" title="成功200 / 拦截403 / 限速429 / 断连444（非订阅路径或HTTP明文）">
+        <span style="color:#22c55e">${r.s200}</span>/<span style="color:#ef4444">${r.s403}</span>/<span style="color:#eab308">${r.s429}</span>/<span style="color:#64748b">${r.s444}</span>
       </span>
     </div>`).join('') : '<div class="empty">暂无数据</div>';
 
   // Top Token
-  const toks = statsLimits.tokens > 0 ? (data.top_tokens||[]).slice(0, statsLimits.tokens) : (data.top_tokens||[]);
+  const allToks = data.top_tokens || [];
+  const toksLimit = statsLimits.tokens;
+  const toksPage  = statsPages.tokens;
+  const toks = toksLimit > 0 ? allToks.slice((toksPage-1)*toksLimit, toksPage*toksLimit) : allToks;
+  const toksStart = toksLimit > 0 ? (toksPage-1)*toksLimit : 0;
+  renderStatsPagination('tokens', allToks.length, toksLimit);
   document.getElementById('top-tokens').innerHTML = toks.length ? toks.map((r,i) => `
     <div class="top-row">
-      <span class="top-rank">${i+1}</span>
+      <span class="top-rank">${toksStart+i+1}</span>
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
         <span class="token-text" title="${esc(r.token_full)}">${esc(r.token_full)}</span>
         <button class="copy-btn" data-val="${esc(r.token_full)}" onclick="copyText(this.dataset.val)">复制</button>
@@ -763,7 +891,11 @@ function renderStats() {
     </div>`).join('') : '<div class="empty">暂无数据</div>';
 
   // UA TOP
-  const uas = statsLimits.uas > 0 ? (data.bad_uas||[]).slice(0, statsLimits.uas) : (data.bad_uas||[]);
+  const allUas = data.bad_uas || [];
+  const uasLimit = statsLimits.uas;
+  const uasPage  = statsPages.uas;
+  const uas = uasLimit > 0 ? allUas.slice((uasPage-1)*uasLimit, uasPage*uasLimit) : allUas;
+  renderStatsPagination('uas', allUas.length, uasLimit);
   document.getElementById('bad-uas').innerHTML = uas.length ? `
     <table><thead><tr><th>UA</th><th>403次数</th><th>操作</th></tr></thead>
     <tbody>${uas.map(r => `
@@ -775,7 +907,11 @@ function renderStats() {
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
 
   // 可疑 Token
-  const suspToks = statsLimits.suspTokens > 0 ? (data.susp_tokens||[]).slice(0, statsLimits.suspTokens) : (data.susp_tokens||[]);
+  const allSuspToks = data.susp_tokens || [];
+  const suspToksLimit = statsLimits.suspTokens;
+  const suspToksPage  = statsPages.suspTokens;
+  const suspToks = suspToksLimit > 0 ? allSuspToks.slice((suspToksPage-1)*suspToksLimit, suspToksPage*suspToksLimit) : allSuspToks;
+  renderStatsPagination('suspTokens', allSuspToks.length, suspToksLimit);
   document.getElementById('susp-tokens').innerHTML = suspToks.length ? suspToks.map(r => `
     <div class="top-row">
       <span class="top-val token-cell" style="display:flex;align-items:center;gap:6px">
@@ -786,7 +922,11 @@ function renderStats() {
     </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
 
   // 可疑 IP
-  const suspIps = statsLimits.suspIps > 0 ? (data.susp_ips||[]).slice(0, statsLimits.suspIps) : (data.susp_ips||[]);
+  const allSuspIps = data.susp_ips || [];
+  const suspIpsLimit = statsLimits.suspIps;
+  const suspIpsPage  = statsPages.suspIps;
+  const suspIps = suspIpsLimit > 0 ? allSuspIps.slice((suspIpsPage-1)*suspIpsLimit, suspIpsPage*suspIpsLimit) : allSuspIps;
+  renderStatsPagination('suspIps', allSuspIps.length, suspIpsLimit);
   document.getElementById('susp-ips').innerHTML = suspIps.length ? suspIps.map(r => `
     <div class="top-row">
       <span class="top-val">${esc(r.ip)}
@@ -968,8 +1108,8 @@ async function loadWhitelist() {
     document.getElementById('wl-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     toast('加载失败: ' + (data.error||''), 'err'); return;
   }
-  const entries = data.entries || [];
-  if (!entries.length) {
+  allWlEntries = data.entries || [];
+  if (!allWlEntries.length) {
     document.getElementById('wl-list').innerHTML = '<div class="empty">白名单为空</div>';
     return;
   }
@@ -979,7 +1119,7 @@ async function loadWhitelist() {
       <button class="btn-danger" onclick="wlBatchDel()">批量删除选中</button>
     </div>
     <table><thead><tr><th style="width:30px"></th><th>IP / CIDR</th><th>备注</th><th>操作</th></tr></thead>
-    <tbody>${entries.map(e => `
+    <tbody>${allWlEntries.map(e => `
       <tr>
         <td><input type="checkbox" class="wl-check" value="${esc(e.ip)}"></td>
         <td class="ip-cell">${esc(e.ip)}</td>
@@ -987,6 +1127,43 @@ async function loadWhitelist() {
         <td><button class="btn-danger" onclick="wlDel('${esc(e.ip)}')">删除</button></td>
       </tr>`).join('')}
     </tbody></table>`;
+}
+
+function exportWhitelist() {
+  if (!allWlEntries.length) { toast('白名单为空，无需导出', 'err'); return; }
+  const lines = allWlEntries.map(e => e.comment ? `${e.ip}  # ${e.comment}` : e.ip);
+  const blob = new Blob([lines.join('\n') + '\n'], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'whitelist_' + new Date().toISOString().slice(0,10) + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importWhitelist(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  toast('解析中…');
+  const text = await file.text();
+  const ips = [];
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    const ip = t.split(/[\s#]/)[0].trim();
+    if (ip) ips.push(ip);
+  }
+  if (!ips.length) { toast('文件中未找到有效IP/CIDR', 'err'); return; }
+  const d = await apiFetch('/api/whitelist.php', {
+    method: 'POST', body: JSON.stringify({import_ips: ips}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast(`✅ 导入完成：新增 ${d.added} 个，跳过 ${d.skipped} 个重复${d.invalid ? `，${d.invalid} 个格式错误` : ''}。点击"生效"应用`);
+    loadWhitelist();
+  } else {
+    toast(d.error || '导入失败', 'err');
+  }
 }
 
 function toggleAllWl(cb) {
@@ -1049,7 +1226,8 @@ async function loadBlacklist() {
     document.getElementById('bl-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
     toast('加载失败: ' + (data.error||''), 'err'); return;
   }
-  const entries = data.entries || [];
+  allBlEntries = data.entries || [];
+  const entries = allBlEntries;
   const idcSummary = data.idc_summary || [];
 
   let html = '';
@@ -1130,6 +1308,170 @@ async function blDel(ip) {
   });
   if (d.ok) { toast('✅ 已解封并立即生效'); loadBlacklist(); }
   else toast(d.error||'解封失败','err');
+}
+
+// ── 黑名单导入/导出 ────────────────────────────────────────────
+function exportBlacklist() {
+  if (!allBlEntries.length) { toast('黑名单为空，无需导出', 'err'); return; }
+  const lines = allBlEntries.map(e => {
+    const cmt = e.comment ? `  # ${e.comment} (${e.added_at||''})` : (e.added_at ? `  # ${e.added_at}` : '');
+    return e.ip + cmt;
+  });
+  const blob = new Blob([lines.join('\n') + '\n'], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'blacklist_' + new Date().toISOString().slice(0,10) + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importBlacklist(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  toast('解析中…');
+  const text = await file.text();
+  const ips = [];
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    // 跳过 nginx deny 语法行
+    const m = t.match(/^(?:deny\s+)?(\d{1,3}(?:\.\d{1,3}){3}(?:\/\d+)?)/);
+    if (m) ips.push(m[1]);
+  }
+  if (!ips.length) { toast('文件中未找到有效IP/CIDR', 'err'); return; }
+  const d = await apiFetch('/api/blacklist.php', {
+    method: 'POST', body: JSON.stringify({import_ips: ips}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast(`✅ 导入完成：新增 ${d.added} 个，跳过 ${d.skipped} 个重复${d.invalid ? `，${d.invalid} 个格式错误` : ''}，nginx 已重载`);
+    loadBlacklist();
+  } else {
+    toast(d.error || '导入失败', 'err');
+  }
+}
+
+// ── 系统设置 ───────────────────────────────────────────────────
+let currentSettings = {};
+
+async function loadSettings() {
+  const data = await apiFetch('/api/settings.php');
+  if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
+  currentSettings = data.settings || {};
+  // 填充界面设置
+  document.getElementById('cfg-site-title').value   = currentSettings.site_title || '';
+  document.getElementById('cfg-page-title').value   = currentSettings.page_title || '';
+  // 填充凭证设置
+  document.getElementById('cfg-admin-user').value   = currentSettings.admin_user || '';
+  document.getElementById('cfg-new-pass').value     = '';
+  document.getElementById('cfg-confirm-pass').value = '';
+  // 填充上游设置
+  document.getElementById('cfg-upstream-url').value    = currentSettings.upstream_url || '';
+  document.getElementById('cfg-subscribe-path').value  = currentSettings.subscribe_path || '';
+  // 显示证书信息
+  const cert = data.cert || {};
+  const certEl = document.getElementById('cert-info');
+  if (!cert.exists) {
+    certEl.innerHTML = '<div class="empty" style="color:#ef4444">⚠️ 未找到证书文件</div>';
+  } else if (cert.subject) {
+    const color = cert.days_left > 30 ? '#22c55e' : cert.days_left > 7 ? '#eab308' : '#ef4444';
+    certEl.innerHTML = `
+      <table style="font-size:12px;width:100%">
+        <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">域名</td><td style="color:var(--text);padding:4px 0 4px 10px">${esc(cert.subject)}</td></tr>
+        <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">颁发机构</td><td style="color:var(--text2);padding:4px 0 4px 10px">${esc(cert.issuer)}</td></tr>
+        <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">有效期</td><td style="padding:4px 0 4px 10px">${esc(cert.valid_from)} ~ ${esc(cert.valid_to)}</td></tr>
+        <tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">剩余天数</td><td style="color:${color};font-weight:600;padding:4px 0 4px 10px">${cert.days_left} 天</td></tr>
+        ${cert.san ? `<tr><td style="color:var(--text3);padding:4px 0;white-space:nowrap">SAN</td><td style="color:var(--text3);font-size:11px;padding:4px 0 4px 10px;word-break:break-all">${esc(cert.san)}</td></tr>` : ''}
+      </table>`;
+  } else {
+    certEl.innerHTML = '<div class="empty" style="color:#eab308">证书存在但无法解析（可能是非标准格式）</div>';
+  }
+  // 显示部署信息
+  await loadDeployInfo();
+}
+
+async function loadDeployInfo() {
+  const r = await apiFetch('/api/settings.php?deploy_info=1');
+  const el = document.getElementById('deploy-info-content');
+  if (r.ok && r.content) {
+    el.textContent = r.content;
+  } else {
+    el.textContent = '（尚未生成，点击"同步更新"创建）';
+  }
+}
+
+async function saveTitleSettings() {
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST',
+    body: JSON.stringify({
+      site_title: document.getElementById('cfg-site-title').value.trim(),
+      page_title: document.getElementById('cfg-page-title').value.trim(),
+    }),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) { toast('✅ 标题设置已保存，刷新页面生效'); }
+  else toast(d.error || '保存失败', 'err');
+}
+
+async function saveCredSettings() {
+  const user    = document.getElementById('cfg-admin-user').value.trim();
+  const newPass = document.getElementById('cfg-new-pass').value;
+  const confPass= document.getElementById('cfg-confirm-pass').value;
+  if (!user) { toast('用户名不能为空', 'err'); return; }
+  const body = {admin_user: user};
+  if (newPass) { body.new_pass = newPass; body.confirm_pass = confPass; }
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify(body),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ 凭证已更新，请重新登录');
+    document.getElementById('cfg-new-pass').value = '';
+    document.getElementById('cfg-confirm-pass').value = '';
+    if (newPass) setTimeout(() => location.reload(), 2000);
+  } else {
+    toast(d.error || '保存失败', 'err');
+  }
+}
+
+async function saveUpstreamSettings() {
+  const url  = document.getElementById('cfg-upstream-url').value.trim();
+  const path = document.getElementById('cfg-subscribe-path').value.trim();
+  if (!url && !path) { toast('请填写机场地址或订阅路径', 'err'); return; }
+  const body = {};
+  if (url) body.upstream_url = url;
+  if (path) body.subscribe_path = path;
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify(body),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ ' + (d.msg || '上游配置已更新'));
+    loadSettings();
+  } else {
+    toast(d.error || '保存失败', 'err');
+  }
+}
+
+async function syncDeployInfo() {
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify({_sync_deploy: true}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) { toast('✅ 部署信息已更新'); loadDeployInfo(); }
+  else toast(d.error || '同步失败', 'err');
+}
+
+function downloadDeployInfo() {
+  const content = document.getElementById('deploy-info-content').textContent;
+  if (!content || content.includes('尚未生成')) { toast('请先点击"同步更新"', 'err'); return; }
+  const blob = new Blob([content], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'DEPLOY_INFO.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ── 快捷封禁 IP（从日志/分析页直接封） ──────────────────────────
