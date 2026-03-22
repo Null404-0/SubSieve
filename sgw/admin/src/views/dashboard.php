@@ -1,3 +1,22 @@
+<?php
+// 预读取设置，用于表单字段服务端填充
+$_preSg = [];
+if (file_exists(SETTINGS_JSON)) {
+    $_d = @json_decode(@file_get_contents(SETTINGS_JSON), true);
+    if (is_array($_d)) $_preSg = $_d;
+}
+// 从 protect.conf 提取上游配置（若 settings.json 无记录）
+if ((empty($_preSg['upstream_url']) || empty($_preSg['subscribe_path'])) && file_exists(PROTECT_CONF)) {
+    $_pc = @file_get_contents(PROTECT_CONF);
+    if ($_pc !== false) {
+        if (empty($_preSg['upstream_url']) && preg_match('/proxy_pass\s+(\S+);/m', $_pc, $_m))
+            $_preSg['upstream_url'] = rtrim($_m[1], ';');
+        if (empty($_preSg['subscribe_path']) && preg_match('/^location\s+\^~\s+(\S+)/m', $_pc, $_m))
+            $_preSg['subscribe_path'] = $_m[1];
+    }
+}
+function _val(string $v): string { return htmlspecialchars($v, ENT_QUOTES); }
+?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -401,11 +420,11 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div style="display:flex;flex-direction:column;gap:12px">
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网站标题（左上角 Logo）</label>
-              <input class="ip-input" id="cfg-site-title" placeholder="SubSieve" style="width:100%">
+              <input class="ip-input" id="cfg-site-title" placeholder="SubSieve" value="<?= _val($_preSg['site_title'] ?? SITE_TITLE) ?>" style="width:100%">
             </div>
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网页标题（浏览器 Tab）</label>
-              <input class="ip-input" id="cfg-page-title" placeholder="SubSieve Admin" style="width:100%">
+              <input class="ip-input" id="cfg-page-title" placeholder="SubSieve Admin" value="<?= _val($_preSg['page_title'] ?? PAGE_TITLE) ?>" style="width:100%">
             </div>
             <button class="btn-primary" onclick="saveTitleSettings()">保存标题设置</button>
           </div>
@@ -417,7 +436,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div style="display:flex;flex-direction:column;gap:12px">
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">用户名</label>
-              <input class="ip-input" id="cfg-admin-user" placeholder="admin" style="width:100%">
+              <input class="ip-input" id="cfg-admin-user" placeholder="admin" value="<?= _val($_preSg['admin_user'] ?? ADMIN_USER) ?>" style="width:100%">
             </div>
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">新密码</label>
@@ -438,11 +457,11 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <div style="display:flex;flex-direction:column;gap:12px">
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址（如 https://panel.yourdomain.com）</label>
-              <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" style="width:100%">
+              <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSg['upstream_url'] ?? '') ?>" style="width:100%">
             </div>
             <div>
               <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">订阅路径</label>
-              <input class="ip-input" id="cfg-subscribe-path" placeholder="/api/v1/client/subscribe" style="width:100%">
+              <input class="ip-input" id="cfg-subscribe-path" placeholder="/api/v1/client/subscribe" value="<?= _val($_preSg['subscribe_path'] ?? '') ?>" style="width:100%">
             </div>
             <div class="apply-hint" style="color:#eab308">⚡ 保存后立即更新 nginx 配置并 reload</div>
             <button class="btn-primary" onclick="saveUpstreamSettings()">保存并立即生效</button>
@@ -1356,7 +1375,10 @@ async function importBlacklist(input) {
 let currentSettings = {};
 
 async function loadSettings() {
-  const data = await apiFetch('/api/settings.php');
+  const [data] = await Promise.all([
+    apiFetch('/api/settings.php'),
+    loadDeployInfo(),
+  ]);
   if (!data.ok) { toast('加载设置失败: ' + (data.error||''), 'err'); return; }
   currentSettings = data.settings || {};
   // 填充界面设置
@@ -1387,8 +1409,6 @@ async function loadSettings() {
   } else {
     certEl.innerHTML = '<div class="empty" style="color:#eab308">证书存在但无法解析（可能是非标准格式）</div>';
   }
-  // 显示部署信息
-  await loadDeployInfo();
 }
 
 async function loadDeployInfo() {

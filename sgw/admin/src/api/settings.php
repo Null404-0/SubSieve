@@ -188,7 +188,11 @@ function get_cert_info(): array {
         return ['exists' => false];
     }
     $info = ['exists' => true, 'path' => $certFile];
-    $certData = @openssl_x509_parse(file_get_contents($certFile));
+    $certContent = @file_get_contents($certFile);
+    if ($certContent === false) {
+        return $info; // 无读取权限，返回 exists:true 但无 subject
+    }
+    $certData = @openssl_x509_parse($certContent);
     if ($certData) {
         $info['subject']   = $certData['subject']['CN'] ?? '';
         $info['valid_to']  = date('Y-m-d', $certData['validTo_time_t']);
