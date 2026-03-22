@@ -173,8 +173,15 @@ function parse_protect_conf(): ?array {
     if (preg_match('/^location\s+\^~\s+(\S+)/m', $content, $m)) {
         $result['subscribe_path'] = $m[1];
     }
-    if (preg_match('/proxy_pass\s+(\S+);/m', $content, $m)) {
+    // 优先从 "set $upstream_backend URL;" 提取（模板生成的 protect.conf 格式）
+    if (preg_match('/set\s+\$upstream_backend\s+(\S+);/m', $content, $m)) {
         $result['upstream_url'] = rtrim($m[1], ';');
+    } elseif (preg_match('/proxy_pass\s+(\S+);/m', $content, $m)) {
+        $val = rtrim($m[1], ';');
+        // 跳过 nginx 变量引用（如 $upstream_backend），只取真实 URL
+        if (!str_starts_with($val, '$')) {
+            $result['upstream_url'] = $val;
+        }
     }
     if (preg_match('/proxy_set_header\s+Host\s+(\S+);/m', $content, $m)) {
         $result['upstream_host'] = rtrim($m[1], ';');

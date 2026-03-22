@@ -9,8 +9,14 @@ if (file_exists(SETTINGS_JSON)) {
 if ((empty($_preSg['upstream_url']) || empty($_preSg['subscribe_path'])) && file_exists(PROTECT_CONF)) {
     $_pc = @file_get_contents(PROTECT_CONF);
     if ($_pc !== false) {
-        if (empty($_preSg['upstream_url']) && preg_match('/proxy_pass\s+(\S+);/m', $_pc, $_m))
-            $_preSg['upstream_url'] = rtrim($_m[1], ';');
+        if (empty($_preSg['upstream_url'])) {
+            if (preg_match('/set\s+\$upstream_backend\s+(\S+);/m', $_pc, $_m)) {
+                $_preSg['upstream_url'] = rtrim($_m[1], ';');
+            } elseif (preg_match('/proxy_pass\s+(\S+);/m', $_pc, $_m)) {
+                $_v = rtrim($_m[1], ';');
+                if (!str_starts_with($_v, '$')) $_preSg['upstream_url'] = $_v;
+            }
+        }
         if (empty($_preSg['subscribe_path']) && preg_match('/^location\s+\^~\s+(\S+)/m', $_pc, $_m))
             $_preSg['subscribe_path'] = $_m[1];
     }
@@ -493,14 +499,14 @@ tr:hover td{background:rgba(99,102,241,.04)}
         <div class="card">
           <div class="card-title">机场（反代目标）</div>
           <div style="display:flex;flex-direction:column;gap:12px">
-            <div style="display:flex;gap:8px;align-items:flex-end">
+            <div style="display:flex;gap:8px;align-items:flex-end;overflow:hidden">
               <div style="flex:1;min-width:0">
                 <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">机场地址</label>
-                <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSgUrlClean) ?>" style="width:100%">
+                <input class="ip-input" id="cfg-upstream-url" placeholder="https://panel.yourdomain.com" value="<?= _val($_preSgUrlClean) ?>" style="width:100%;box-sizing:border-box">
               </div>
-              <div style="width:90px;flex-shrink:0">
+              <div style="flex:0 0 80px;min-width:0">
                 <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">端口</label>
-                <input class="ip-input" id="cfg-upstream-port" type="number" min="1" max="65535" placeholder="443" value="<?= _val((string)$_preSgPort) ?>" style="width:100%">
+                <input class="ip-input" id="cfg-upstream-port" type="number" min="1" max="65535" placeholder="443" value="<?= _val((string)$_preSgPort) ?>" style="width:100%;box-sizing:border-box;min-width:0">
               </div>
             </div>
             <div>
