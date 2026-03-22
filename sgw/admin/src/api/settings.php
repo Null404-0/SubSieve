@@ -16,18 +16,9 @@ if ($method === 'GET') {
                 $s['subscribe_path'] = $s['subscribe_path'] ?? $parsed['subscribe_path'];
             }
         }
-        // 若 upstream_url 无显式端口，从 protect.conf 的 set $upstream_backend 行补全
-        // 该行仅存在于 entrypoint 模板生成的 protect.conf（代表 V2B_BACKEND 中的原始端口）
-        // PHP 重写 protect.conf 后该行消失，故此检查不会误覆盖管理员的主动设置
-        if (!empty($s['upstream_url']) && !parse_url($s['upstream_url'], PHP_URL_PORT)) {
-            $_cr = file_exists(PROTECT_CONF) ? @file_get_contents(PROTECT_CONF) : '';
-            if ($_cr && preg_match('/set\s+\$upstream_backend\s+(\S+);/m', $_cr, $_cm)) {
-                $_cp = parse_url(rtrim($_cm[1], ';'), PHP_URL_PORT);
-                if ($_cp) {
-                    $_sp = parse_url($s['upstream_url']);
-                    $s['upstream_url'] = ($_sp['scheme'] ?? 'https') . '://' . ($_sp['host'] ?? '') . ':' . $_cp;
-                }
-            }
+        // 网关端口：优先取 settings.json 中保存的值，否则取容器环境变量（即 .env 当前值）
+        if (empty($s['gateway_port'])) {
+            $s['gateway_port'] = GATEWAY_PORT;
         }
         json_out(['ok' => true, 'settings' => $s, 'cert' => $certInfo]);
     } catch (Throwable $e) {
@@ -69,6 +60,17 @@ if ($method === 'POST') {
         $s['admin_pass'] = $newPass;
     }
 
+    // ── 网关端口 ───────────────────────────────────────────────
+    $gatewayPortChanged = false;
+    if (isset($body['gateway_port'])) {
+        $gp = (int)$body['gateway_port'];
+        if ($gp < 1 || $gp > 65535) {
+            json_err('网关端口无效（1-65535）');
+        }
+        $s['gateway_port'] = $gp;
+        $gatewayPortChanged = true;
+    }
+
     // ── 上游（机场）配置 ────────────────────────────────────────
     $upstreamChanged = false;
     if (isset($body['upstream_url']) && $body['upstream_url'] !== '') {
@@ -108,11 +110,16 @@ if ($method === 'POST') {
     // 更新 DEPLOY_INFO.txt
     update_deploy_info($s);
 
+    $msg = '设置已保存' . ($nginxReloaded ? '，nginx 已重载' : '');
+    if ($gatewayPortChanged) {
+        $msg .= '。网关端口已记录，需在宿主机执行 bash update.sh 后生效';
+    }
     json_out([
-        'ok'              => true,
-        'nginx_reloaded'  => $nginxReloaded,
-        'protect_updated' => $protectUpdated,
-        'msg'             => '设置已保存' . ($nginxReloaded ? '，nginx 已重载' : ''),
+        'ok'                   => true,
+        'nginx_reloaded'       => $nginxReloaded,
+        'protect_updated'      => $protectUpdated,
+        'gateway_port_changed' => $gatewayPortChanged,
+        'msg'                  => $msg,
     ]);
     } catch (Throwable $e) {
         json_err('PHP错误: ' . $e->getMessage());
