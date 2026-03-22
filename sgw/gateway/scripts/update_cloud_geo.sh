@@ -26,7 +26,46 @@ declare -A ASN_SOURCES=(
 )
 AWS_URL="https://ip-ranges.amazonaws.com/ip-ranges.json"
 
-log "开始更新云厂商IP段..."
+log "开始并行拉取云厂商IP段..."
+
+# ── 并行下载所有数据源 ──────────────────────────────────────────────────────
+# 将每个 curl 放入后台，记录 PID，最后统一 wait，避免串行超时叠加
+# 最坏情况：原来 5×15s + 4×20s + 20s = 175s，现在降至 max(15s, 20s) = 20s
+
+declare -A PIDS=()
+
+for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; do
+    URL="${SOURCES[$NAME]}"
+    SAFE_NAME="$(echo "$NAME" | tr ' ' '_')"
+    TMPFILE="$TEMP_DIR/${SAFE_NAME}.txt"
+    curl -sfL --max-time 15 "$URL" -o "$TMPFILE" &
+    PIDS["isp_${SAFE_NAME}"]=$!
+done
+
+for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
+    ASN="${ASN_SOURCES[$NAME]}"
+    TMPFILE="$TEMP_DIR/${NAME}.json"
+    curl -sfL --max-time 20 \
+        "https://stat.ripe.net/data/announced-prefixes/data.json?resource=${ASN}" \
+        -o "$TMPFILE" &
+    PIDS["asn_${NAME}"]=$!
+done
+
+AWS_TMP="$TEMP_DIR/aws.json"
+curl -sfL --max-time 20 "$AWS_URL" -o "$AWS_TMP" &
+PIDS["aws"]=$!
+
+# 等待所有后台任务完成（各自超时独立计时）
+declare -A RESULTS=()
+for KEY in "${!PIDS[@]}"; do
+    if wait "${PIDS[$KEY]}" 2>/dev/null; then
+        RESULTS[$KEY]="ok"
+    else
+        RESULTS[$KEY]="fail"
+    fi
+done
+
+# ── 拼装输出文件 ────────────────────────────────────────────────────────────
 
 cat > "$OUTPUT_TMP" <<EOF
 # 由 update_cloud_geo.sh 自动生成 | $(date '+%Y-%m-%d %H:%M:%S')
@@ -40,10 +79,10 @@ EOF
 TOTAL=0
 
 for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; do
-    URL="${SOURCES[$NAME]}"
-    TMPFILE="$TEMP_DIR/$(echo "$NAME" | tr ' ' '_').txt"
-    log "拉取 $NAME ..."
-    if curl -sfL --max-time 15 "$URL" -o "$TMPFILE"; then
+    SAFE_NAME="$(echo "$NAME" | tr ' ' '_')"
+    TMPFILE="$TEMP_DIR/${SAFE_NAME}.txt"
+    KEY="isp_${SAFE_NAME}"
+    if [[ "${RESULTS[$KEY]:-fail}" == "ok" ]] && [[ -s "$TMPFILE" ]]; then
         COUNT=$(grep -cE '^[0-9]' "$TMPFILE" || true)
         TOTAL=$((TOTAL + COUNT))
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
@@ -58,12 +97,9 @@ for NAME in "阿里云" "腾讯云" "字节跳动" "华为云" "Google Cloud"; d
 done
 
 for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
-    ASN="${ASN_SOURCES[$NAME]}"
     TMPFILE="$TEMP_DIR/${NAME}.json"
-    log "拉取 $NAME ($ASN) ..."
-    if curl -sfL --max-time 20 \
-        "https://stat.ripe.net/data/announced-prefixes/data.json?resource=${ASN}" \
-        -o "$TMPFILE"; then
+    KEY="asn_${NAME}"
+    if [[ "${RESULTS[$KEY]:-fail}" == "ok" ]] && [[ -s "$TMPFILE" ]]; then
         COUNT=$(grep -o '"prefix":"[0-9][^"]*"' "$TMPFILE" | sed 's/"prefix":"//;s/"//' | wc -l || echo 0)
         TOTAL=$((TOTAL + COUNT))
         echo "    # === $NAME ===" >> "$OUTPUT_TMP"
@@ -77,9 +113,7 @@ for NAME in "UCloud" "Azure" "DigitalOcean" "Vultr"; do
     fi
 done
 
-log "拉取 AWS ..."
-AWS_TMP="$TEMP_DIR/aws.json"
-if curl -sfL --max-time 20 "$AWS_URL" -o "$AWS_TMP"; then
+if [[ "${RESULTS[aws]:-fail}" == "ok" ]] && [[ -s "$AWS_TMP" ]]; then
     echo "    # === AWS ===" >> "$OUTPUT_TMP"
     grep -o '"ip_prefix":"[^"]*"' "$AWS_TMP" | sed 's/"ip_prefix":"//;s/"//' | sort -u | while read -r cidr; do
         echo "    $cidr 1;" >> "$OUTPUT_TMP"
