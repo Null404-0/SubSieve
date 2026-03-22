@@ -244,7 +244,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <table>
             <thead>
               <tr>
-                <th>时间</th><th>IP</th><th>备注</th><th>状态</th><th>Token</th>
+                <th>时间</th><th>IP</th><th style="color:#64748b;font-weight:400;font-size:11px" title="显示该IP在白/黑名单中的备注，如需修改请前往对应管理页">备注 <span style="opacity:.6">（只读）</span></th><th>状态</th><th>Token</th>
                 <th>请求</th><th>UA</th>
               </tr>
             </thead>
@@ -428,7 +428,7 @@ tr:hover td{background:rgba(99,102,241,.04)}
           <button class="btn-primary" onclick="tbAdd()">添加</button>
         </div>
         <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
-          ⚡ 加入黑名单的 Token 不再参与分析统计，此处仅显示今日被哪些 IP 拉取过。
+          ⚡ Token 黑名单<strong>不会直接拦截请求</strong>，仅用于监控追踪——黑名单内的 Token 不计入分析统计，此处显示今日各 IP 的拉取记录。如需真正阻断访问，请通过 IP 黑名单或 UA 封禁实现。
         </div>
         <div id="tb-list"><div class="loading">加载中…</div></div>
       </div>
@@ -1122,7 +1122,7 @@ function renderStats() {
     <div class="top-row">
       <span class="top-val">${esc(r.ip)}
         ${suspBtn}
-        <button class="add-btn-sm" style="background:#22c55e;margin-left:4px" onclick="quickWhitelistIp('${esc(r.ip)}')">白</button>
+        <button class="add-btn-sm" style="background:rgba(34,197,94,.2);color:#22c55e;border-color:rgba(34,197,94,.4);margin-left:4px" onclick="quickWhitelistIp('${esc(r.ip)}')">白</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.token_count} 个Token</span>
     </div>`;
