@@ -967,12 +967,12 @@ function renderStats() {
   const uas = uasLimit > 0 ? allUas.slice((uasPage-1)*uasLimit, uasPage*uasLimit) : allUas;
   renderStatsPagination('uas', allUas.length, uasLimit);
   document.getElementById('bad-uas').innerHTML = uas.length ? `
-    <table><thead><tr><th>UA</th><th>403次数</th><th>操作</th></tr></thead>
+    <table><thead><tr><th>UA</th><th style="width:60px">403次数</th><th style="width:70px;white-space:nowrap">操作</th></tr></thead>
     <tbody>${uas.map(r => `
       <tr>
         <td class="ua-cell" style="max-width:400px;padding:3px 8px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
         <td style="color:#ef4444;font-weight:600;padding:3px 8px">${r.count}</td>
-        <td style="padding:3px 8px"><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
+        <td style="padding:3px 8px;white-space:nowrap"><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
       </tr>`).join('')}
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
 
