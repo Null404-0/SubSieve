@@ -24,6 +24,7 @@ if ($method === 'GET') {
 
 // POST — 保存设置
 if ($method === 'POST') {
+    try {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
     // 仅同步部署信息
@@ -100,6 +101,9 @@ if ($method === 'POST') {
         'protect_updated' => $protectUpdated,
         'msg'             => '设置已保存' . ($nginxReloaded ? '，nginx 已重载' : ''),
     ]);
+    } catch (Throwable $e) {
+        json_err('PHP错误: ' . $e->getMessage());
+    }
 }
 
 json_err('不支持的请求方式', 405);
@@ -217,10 +221,11 @@ function update_deploy_info(array $s): void {
     $upstreamUrl   = $protectInfo['upstream_url']   ?? $s['upstream_url']   ?? '—';
     $adminUser     = $s['admin_user'] ?? ADMIN_USER;
     $siteTitle     = $s['site_title'] ?? SITE_TITLE;
+    $now           = date('Y-m-d H:i:s');
 
     $content = <<<TXT
 $siteTitle 部署信息
-更新时间: {$_SERVER['REQUEST_TIME_FLOAT'] ? date('Y-m-d H:i:s') : date('Y-m-d H:i:s')}
+更新时间: $now
 
 管理后台
   用户名: $adminUser
