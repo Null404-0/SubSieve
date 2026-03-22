@@ -113,8 +113,16 @@ if ($method === 'POST') {
     json_out(['ok' => true, 'imported' => $imported, 'total' => $total]);
 }
 
-// ── DELETE — 删除7天前的日志行 ──────────────────────────────
+// ── DELETE — 删除日志 ───────────────────────────────────────
 if ($method === 'DELETE') {
+    // 删除当前所有日志
+    if (($_SERVER['HTTP_X_DELETE_ALL'] ?? '') === '1') {
+        if (file_exists(LOG_FILE)) {
+            file_put_contents(LOG_FILE, '', LOCK_EX);
+        }
+        json_out(['ok' => true, 'deleted' => 'all', 'kept' => 0]);
+    }
+
     if (!file_exists(LOG_FILE)) {
         json_out(['ok' => true, 'deleted' => 0, 'kept' => 0]);
     }
