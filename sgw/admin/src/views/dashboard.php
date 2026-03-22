@@ -1858,6 +1858,15 @@ async function importLogs(input) {
       headers: {'X-Requested-With': 'XMLHttpRequest'},
       body: fd,
     });
+    if (r.status === 413) {
+      toast('导入失败：文件过大，超出服务器上传限制', 'err');
+      return;
+    }
+    const ct = r.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) {
+      toast(`导入失败：服务器错误 (HTTP ${r.status})`, 'err');
+      return;
+    }
     const d = await r.json();
     if (d.ok) {
       toast(`✅ 导入成功：新增 ${d.imported} 行，共 ${d.total} 行`);
