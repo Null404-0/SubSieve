@@ -32,6 +32,26 @@ if ($method === 'POST') {
     json_out(['ok' => true, 'nginx_reloaded' => $reload]);
 }
 
+// PATCH — 更新备注（仅更新 JSON，不 reload nginx）
+if ($method === 'PATCH') {
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $ua      = trim($body['ua'] ?? '');
+    $comment = trim($body['comment'] ?? '');
+
+    if (!$ua) json_err('缺少 ua 参数');
+
+    $entries = read_ua_blacklist();
+    $found   = false;
+    foreach ($entries as &$e) {
+        if ($e['ua'] === $ua) { $e['comment'] = $comment; $found = true; break; }
+    }
+    unset($e);
+
+    if (!$found) json_err('未找到该UA');
+    file_put_contents(UA_BLACKLIST_JSON, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    json_out(['ok' => true]);
+}
+
 // DELETE — 移除并立即生效
 if ($method === 'DELETE') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];

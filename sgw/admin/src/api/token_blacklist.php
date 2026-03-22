@@ -68,6 +68,26 @@ if ($method === 'POST') {
     json_out(['ok' => true]);
 }
 
+// PATCH — 更新备注
+if ($method === 'PATCH') {
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $token   = trim($body['token'] ?? '');
+    $comment = trim($body['comment'] ?? '');
+
+    if (!$token) json_err('缺少 token 参数');
+
+    $entries = read_token_blacklist();
+    $found   = false;
+    foreach ($entries as &$e) {
+        if ($e['token'] === $token) { $e['comment'] = $comment; $found = true; break; }
+    }
+    unset($e);
+
+    if (!$found) json_err('未找到该Token');
+    if (!write_token_blacklist($entries)) json_err('写入失败，请检查文件权限');
+    json_out(['ok' => true]);
+}
+
 // DELETE — 移除 Token 黑名单
 if ($method === 'DELETE') {
     $body  = json_decode(file_get_contents('php://input'), true) ?? [];
