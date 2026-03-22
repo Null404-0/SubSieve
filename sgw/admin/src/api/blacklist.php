@@ -14,9 +14,36 @@ if ($method === 'GET') {
     json_out(['ok' => true, 'entries' => read_blacklist(), 'idc_summary' => $idc]);
 }
 
-// POST — 添加并立即生效
+// POST — 添加并立即生效（单个或批量导入）
 if ($method === 'POST') {
     $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    // 批量导入（来自文件导入）
+    if (!empty($body['import_ips']) && is_array($body['import_ips'])) {
+        $entries    = read_blacklist();
+        $existingSet = [];
+        foreach ($entries as $e) $existingSet[$e['ip']] = true;
+        $added = 0; $skipped = 0; $invalid = 0;
+        foreach ($body['import_ips'] as $rawIp) {
+            $ip = trim($rawIp);
+            if (!$ip) continue;
+            // 支持 IP 和 CIDR
+            if (!preg_match('/^\d{1,3}(\.\d{1,3}){3}(\/\d+)?$/', $ip)) { $invalid++; continue; }
+            if (isset($existingSet[$ip])) { $skipped++; continue; }
+            $entries[] = ['ip' => $ip, 'comment' => '从文件导入', 'added_at' => date('Y-m-d H:i')];
+            $existingSet[$ip] = true;
+            $added++;
+        }
+        if ($added > 0) {
+            if (!write_blacklist($entries)) json_err('写入黑名单文件失败，请检查文件权限');
+            $reload = nginx_reload();
+        } else {
+            $reload = false;
+        }
+        json_out(['ok' => true, 'added' => $added, 'skipped' => $skipped, 'invalid' => $invalid, 'nginx_reloaded' => $reload]);
+    }
+
+    // 单个添加
     $ip      = trim($body['ip'] ?? '');
     $comment = trim($body['comment'] ?? '');
 

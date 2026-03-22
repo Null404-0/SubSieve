@@ -8,9 +8,32 @@ if ($method === 'GET') {
     json_out(['ok' => true, 'entries' => read_whitelist()]);
 }
 
-// POST — 添加条目
+// POST — 添加条目（单个或批量导入）
 if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    // 批量导入（来自文件导入）
+    if (!empty($body['import_ips']) && is_array($body['import_ips'])) {
+        $entries = read_whitelist();
+        $existingSet = [];
+        foreach ($entries as $e) $existingSet[$e['ip']] = true;
+        $newLines = []; $added = 0; $skipped = 0; $invalid = 0;
+        foreach ($body['import_ips'] as $rawIp) {
+            $ip = trim($rawIp);
+            if (!$ip) continue;
+            if (!preg_match('/^[\d\.\/\:a-fA-F]+$/', $ip)) { $invalid++; continue; }
+            if (isset($existingSet[$ip])) { $skipped++; continue; }
+            $newLines[] = $ip . '  # 从文件导入';
+            $existingSet[$ip] = true;
+            $added++;
+        }
+        if ($added > 0) {
+            file_put_contents(WHITELIST_IPS, implode("\n", $newLines) . "\n", FILE_APPEND | LOCK_EX);
+        }
+        json_out(['ok' => true, 'added' => $added, 'skipped' => $skipped, 'invalid' => $invalid]);
+    }
+
+    // 单个添加
     $ip      = trim($body['ip'] ?? '');
     $comment = trim($body['comment'] ?? '');
 
