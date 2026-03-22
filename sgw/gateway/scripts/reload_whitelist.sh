@@ -16,7 +16,10 @@ EOF
 if [[ -f "$WHITELIST_FILE" ]]; then
     while IFS= read -r line; do
         [[ -z "$line" || "$line" =~ ^# ]] && continue
-        echo "    $line 1;" >> "$OUTPUT"
+        # 提取 IP/CIDR 部分（去除行内注释和多余空白）
+        ip=$(echo "$line" | awk '{print $1}')
+        [[ -z "$ip" ]] && continue
+        echo "    $ip 1;" >> "$OUTPUT"
     done < "$WHITELIST_FILE"
 fi
 
