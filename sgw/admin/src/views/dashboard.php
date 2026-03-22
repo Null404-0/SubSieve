@@ -809,21 +809,17 @@ async function deleteLogs() {
   }
 }
 
-// ── 从日志加入白名单（点击"黑名单"徽章触发：解封 + 加白名单）────
+// ── 从日志解封（点击"黑名单"徽章：仅移除黑名单）────────────────
 async function quickWhitelist(ip) {
-  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
-  const d1 = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
+  if (!confirm(`是否解封 ${ip}？`)) return;
+  const d = await apiFetch('/api/blacklist.php', {method:'DELETE', body:JSON.stringify({ip}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
-  if (!d1.ok) { toast(d1.error || '解封失败', 'err'); return; }
-  const d2 = await apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
-  if (d2.ok || (d2.error && d2.error.includes('已在白名单'))) {
-    toast(`✅ ${ip} 已加入白名单`);
+  if (d.ok) {
+    toast(`✅ ${ip} 已解封`);
     blacklistIpSet.delete(ip);
-    whitelistIpSet.add(ip);
     renderLogs();
   } else {
-    toast(d2.error || '加入白名单失败', 'err');
+    toast(d.error || '解封失败', 'err');
   }
 }
 
@@ -832,13 +828,11 @@ async function quickRemoveWhitelist(ip) {
   if (!confirm(`是否移出白名单？`)) return;
   const d = await apiFetch('/api/whitelist.php', {method:'DELETE', body:JSON.stringify({ip}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
-  if (d.ok) {
-    toast(`✅ ${ip} 已移出白名单`);
-    whitelistIpSet.delete(ip);
-    renderLogs();
-  } else {
-    toast(d.error || '移除失败', 'err');
-  }
+  if (!d.ok) { toast(d.error || '移除失败', 'err'); return; }
+  await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+  toast(`✅ ${ip} 已移出白名单并生效`);
+  whitelistIpSet.delete(ip);
+  renderLogs();
 }
 
 // ── 分析 ──────────────────────────────────────────────────────
@@ -992,8 +986,8 @@ async function quickWhitelistIp(ip) {
     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
   });
   if (d.ok || (d.error && d.error.includes('已在白名单'))) {
-    toast(`✅ ${ip} 已加入白名单`);
-    // 从本地缓存移除该IP并立即重绘，无需等待重新拉取数据
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ ${ip} 已加入白名单并生效`);
     if (allStatsData) {
       allStatsData.susp_ips = (allStatsData.susp_ips || []).filter(r => r.ip !== ip);
       renderStats();
@@ -1248,9 +1242,15 @@ async function wlAdd() {
   }
   document.getElementById('wl-ip').value = '';
   document.getElementById('wl-comment').value = '';
-  if (!errs.length) toast(`✅ 已添加 ${ok} 个，点击"生效"应用`);
-  else if (ok) toast(`添加 ${ok} 个成功，${errs.length} 个失败`, 'err');
-  else toast(errs[0]||'添加失败', 'err');
+  if (!errs.length) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ 已添加 ${ok} 个并生效`);
+  } else if (ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`添加 ${ok} 个成功并生效，${errs.length} 个失败`, 'err');
+  } else {
+    toast(errs[0]||'添加失败', 'err');
+  }
   loadWhitelist();
 }
 
@@ -1259,8 +1259,10 @@ async function wlDel(ip) {
     method:'DELETE', body:JSON.stringify({ip}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) { toast('已删除，点击"生效"应用'); loadWhitelist(); }
-  else toast(d.error||'删除失败','err');
+  if (d.ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast('✅ 已删除并生效'); loadWhitelist();
+  } else toast(d.error||'删除失败','err');
 }
 
 async function wlBatchDel() {
@@ -1271,8 +1273,10 @@ async function wlBatchDel() {
     method:'DELETE', body:JSON.stringify({ips}),
     headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
   });
-  if (d.ok) { toast(`✅ 已删除 ${ips.length} 个，点击"生效"应用`); loadWhitelist(); }
-  else toast(d.error||'批量删除失败','err');
+  if (d.ok) {
+    await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+    toast(`✅ 已删除 ${ips.length} 个并生效`); loadWhitelist();
+  } else toast(d.error||'批量删除失败','err');
 }
 
 async function wlApply() {
