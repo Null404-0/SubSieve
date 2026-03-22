@@ -18,7 +18,7 @@ echo -e "${BOLD}SubSieve — 部署向导${RESET}"
 echo "────────────────────────────────────────"
 
 # ── 加载上次保存的输入 ─────────────────────────────────────────
-_S_V2B_HOST=""; _S_SUBSCRIBE_PATH=""; _S_GATEWAY_PORT=""; _S_SSL_DOMAIN=""
+_S_V2B_HOST=""; _S_V2B_PORT=""; _S_SUBSCRIBE_PATH=""; _S_GATEWAY_PORT=""; _S_SSL_DOMAIN=""
 if [[ -f "$STATE_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$STATE_FILE" 2>/dev/null || true
@@ -72,7 +72,12 @@ echo ""
 echo -e "${CYAN}请填写机场信息${RESET}"
 ask "机场地址（如 panel.yourdomain.com，不含 https://）" "$_S_V2B_HOST" V2B_HOST
 V2B_HOST="${V2B_HOST#https://}"
-V2B_BACKEND="https://${V2B_HOST}"
+ask "机场面板端口（标准 HTTPS 填 443）" "${_S_V2B_PORT:-443}" V2B_PORT
+if [[ "$V2B_PORT" == "443" ]]; then
+    V2B_BACKEND="https://${V2B_HOST}"
+else
+    V2B_BACKEND="https://${V2B_HOST}:${V2B_PORT}"
+fi
 
 ask "订阅路径（默认 /api/v1/client/subscribe）" "${_S_SUBSCRIBE_PATH:-/api/v1/client/subscribe}" SUBSCRIBE_PATH
 
@@ -91,6 +96,7 @@ SSL_DOMAIN="${SSL_DOMAIN%%/*}"
 # ── 持久化本次输入（下次重跑时作为默认值）────────────────────
 cat > "$STATE_FILE" <<EOF
 _S_V2B_HOST="${V2B_HOST}"
+_S_V2B_PORT="${V2B_PORT}"
 _S_SUBSCRIBE_PATH="${SUBSCRIBE_PATH}"
 _S_GATEWAY_PORT="${GATEWAY_PORT}"
 _S_SSL_DOMAIN="${SSL_DOMAIN}"

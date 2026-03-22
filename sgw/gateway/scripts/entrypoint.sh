@@ -10,9 +10,17 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [entrypoint] $*" | tee -a "$LOG"; }
 [[ -z "${V2B_HOST:-}" ]]    && { echo "❌ V2B_HOST 未设置"; exit 1; }
 
 log "生成 protect.conf ..."
-envsubst '${V2B_BACKEND} ${V2B_HOST} ${SUBSCRIBE_PATH}' \
-    < /etc/nginx/templates-src/subscribe_protect.conf.template \
-    > /etc/nginx/subscribe/protect.conf
+# 若 protect.conf 已由管理员面板配置（PHP 格式，无 set $upstream_backend 行），
+# 则保留现有配置，避免重启覆盖管理员在 UI 中保存的端口等设置。
+# 只有模板格式（含 set $upstream_backend）或文件不存在时才重新生成。
+_PROTECT_CONF="/etc/nginx/subscribe/protect.conf"
+if [[ -f "$_PROTECT_CONF" ]] && ! grep -q 'set \$upstream_backend' "$_PROTECT_CONF"; then
+    log "protect.conf 已由管理员配置，保留现有配置（跳过模板生成）"
+else
+    envsubst '${V2B_BACKEND} ${V2B_HOST} ${SUBSCRIBE_PATH}' \
+        < /etc/nginx/templates-src/subscribe_protect.conf.template \
+        > "$_PROTECT_CONF"
+fi
 
 cp /etc/nginx/templates-src/nginx.conf /etc/nginx/nginx.conf
 
