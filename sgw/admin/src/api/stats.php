@@ -10,6 +10,17 @@ $badUas = [];   // ua => count (403 only, today)
 $suspTokenIps = [];  // token => {ip => true}
 $suspIpTokens = [];  // ip    => {token => true}
 
+// 读取Token黑名单（用于从统计中排除）
+$tokenBlacklist = [];
+if (file_exists(TOKEN_BLACKLIST_JSON)) {
+    $tbData = json_decode(file_get_contents(TOKEN_BLACKLIST_JSON), true);
+    if (is_array($tbData)) {
+        foreach ($tbData as $e) {
+            if (!empty($e['token'])) $tokenBlacklist[$e['token']] = true;
+        }
+    }
+}
+
 // 读取白名单（用于排除）
 $whitelistIps = [];
 if (file_exists(WHITELIST_IPS)) {
@@ -45,9 +56,11 @@ if (file_exists(LOG_FILE)) {
 
                 if (preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)) {
                     $tok = $tm[1];
-                    if (!isset($tokens[$tok])) $tokens[$tok] = ['count'=>0,'last_time'=>''];
-                    $tokens[$tok]['count']++;
-                    $tokens[$tok]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
+                    if (!isset($tokenBlacklist[$tok])) {
+                        if (!isset($tokens[$tok])) $tokens[$tok] = ['count'=>0,'last_time'=>''];
+                        $tokens[$tok]['count']++;
+                        $tokens[$tok]['last_time'] = trim(preg_replace('/^\d+\/\w+\/\d+:/', '', preg_replace('/ \+\d+$/', '', $time)));
+                    }
                 }
 
                 if ($status === 403 && $ua !== '') {
@@ -56,14 +69,16 @@ if (file_exists(LOG_FILE)) {
                 }
             }
 
-            // ── 全量可疑分析（200 状态的订阅请求，排除白名单IP）──────
+            // ── 全量可疑分析（200 状态的订阅请求，排除白名单IP和Token黑名单）──
             if ($status === 200
                 && !isset($whitelistIps[$ip])
                 && preg_match('/[?&]token=([^&\s]+)/i', $request, $tm)
             ) {
                 $tok = $tm[1];
-                $suspTokenIps[$tok][$ip] = true;
-                $suspIpTokens[$ip][$tok]  = true;
+                if (!isset($tokenBlacklist[$tok])) {
+                    $suspTokenIps[$tok][$ip] = true;
+                    $suspIpTokens[$ip][$tok]  = true;
+                }
             }
         }
         fclose($handle);

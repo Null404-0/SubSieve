@@ -177,10 +177,13 @@ tr:hover td{background:rgba(99,102,241,.04)}
     <span class="nav-icon">🛡</span>UA
   </button>
   <button class="nav-item" onclick="switchTab('whitelist',this)">
-    <span class="nav-icon">✅</span>白名单
+    <span class="nav-icon">✅</span>IP白名单
   </button>
   <button class="nav-item" onclick="switchTab('blacklist',this)">
-    <span class="nav-icon">🚫</span>黑名单
+    <span class="nav-icon">🚫</span>IP黑名单
+  </button>
+  <button class="nav-item" onclick="switchTab('token_blacklist',this)">
+    <span class="nav-icon">🔑</span>Token黑名单
   </button>
   <button class="nav-item" onclick="switchTab('settings',this)">
     <span class="nav-icon">⚙</span>系统设置
@@ -413,6 +416,22 @@ tr:hover td{background:rgba(99,102,241,.04)}
       </div>
     </div>
 
+    <!-- ─── Token黑名单 ──────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-token_blacklist">
+      <div class="card">
+        <div class="card-title">添加 Token 黑名单</div>
+        <div class="ip-form">
+          <input class="ip-input" id="tb-token" placeholder="完整 Token">
+          <input class="comment-input" id="tb-comment" placeholder="备注（可选）">
+          <button class="btn-primary" onclick="tbAdd()">添加</button>
+        </div>
+        <div class="apply-hint" style="margin-bottom:14px;color:#eab308">
+          ⚡ 加入黑名单的 Token 不再参与分析统计，此处仅显示今日被哪些 IP 拉取过。
+        </div>
+        <div id="tb-list"><div class="loading">加载中…</div></div>
+      </div>
+    </div>
+
     <!-- ─── 系统设置 ───────────────────────────────────────── -->
     <div class="tab-panel" id="panel-settings">
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
@@ -541,12 +560,13 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
 });
 applyTheme();
 const TABS = {
-  logs:         {title:'日志',   loader:loadLogs},
-  stats:        {title:'分析',   loader:loadStats},
-  ua_blacklist: {title:'UA',     loader:loadUaBlacklist},
-  whitelist:    {title:'白名单', loader:loadWhitelist},
-  blacklist:    {title:'黑名单', loader:loadBlacklist},
-  settings:     {title:'系统设置', loader:loadSettings},
+  logs:            {title:'日志',        loader:loadLogs},
+  stats:           {title:'分析',        loader:loadStats},
+  ua_blacklist:    {title:'UA',          loader:loadUaBlacklist},
+  whitelist:       {title:'IP白名单',    loader:loadWhitelist},
+  blacklist:       {title:'IP黑名单',    loader:loadBlacklist},
+  token_blacklist: {title:'Token黑名单', loader:loadTokenBlacklist},
+  settings:        {title:'系统设置',    loader:loadSettings},
 };
 let currentTab = 'logs';
 
@@ -778,7 +798,7 @@ function renderLogRows(rows) {
         ? `<button class="wl-badge-btn" onclick="quickRemoveWhitelist('${esc(l.ip)}')">白名单</button>`
         : isCloud
           ? `<span class="bl-badge-btn" style="cursor:default;background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.3)">黑名单</span>`
-          : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button>`;
+          : `<button class="add-btn-sm" onclick="quickBlacklist('${esc(l.ip)}')">封</button><button class="add-btn-sm" style="background:rgba(99,102,241,.15);color:#818cf8;border-color:rgba(99,102,241,.3)" onclick="quickAddWhitelistFromLog('${esc(l.ip)}')">白</button>`;
     const tokenHtml = l.token
       ? `<div style="display:inline-flex;align-items:center;gap:3px;font-family:monospace;font-size:11px;color:#818cf8"><span title="${esc(l.token)}">${esc(l.token)}</span><button class="copy-btn" data-val="${esc(l.token)}" onclick="copyText(this.dataset.val)">复制</button></div>`
       : '—';
@@ -804,6 +824,7 @@ async function deleteLogs() {
   if (d.ok) {
     toast(`✅ 已删除 ${d.deleted} 行，保留 ${d.kept} 行`);
     loadLogs();
+    if (allStatsData) loadStats();
   } else {
     toast(d.error || '删除失败', 'err');
   }
@@ -832,6 +853,20 @@ async function quickRemoveWhitelist(ip) {
   await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
   toast(`✅ ${ip} 已移出白名单并生效`);
   whitelistIpSet.delete(ip);
+  renderLogs();
+}
+
+// ── 从日志加入白名单（"白"按钮）──────────────────────────────────
+async function quickAddWhitelistFromLog(ip) {
+  if (!confirm(`是否将 ${ip} 加入白名单？`)) return;
+  const d = await apiFetch('/api/whitelist.php', {method:'POST', body:JSON.stringify({ip, comment:'从日志加入白名单'}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}});
+  if (!d.ok && !(d.error && d.error.includes('已在白名单'))) {
+    toast(d.error || '加入白名单失败', 'err'); return;
+  }
+  await apiFetch('/api/whitelist.php', {method:'PUT', headers:{'X-Requested-With':'XMLHttpRequest'}});
+  toast(`✅ ${ip} 已加入白名单并生效`);
+  whitelistIpSet.add(ip);
   renderLogs();
 }
 
@@ -935,9 +970,9 @@ function renderStats() {
     <table><thead><tr><th>UA</th><th>403次数</th><th>操作</th></tr></thead>
     <tbody>${uas.map(r => `
       <tr>
-        <td class="ua-cell" style="max-width:400px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
-        <td style="color:#ef4444;font-weight:600">${r.count}</td>
-        <td><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
+        <td class="ua-cell" style="max-width:400px;padding:3px 8px" title="${esc(r.ua)}">${esc(r.ua)||'（空UA）'}</td>
+        <td style="color:#ef4444;font-weight:600;padding:3px 8px">${r.count}</td>
+        <td style="padding:3px 8px"><button class="add-btn-sm" onclick="quickBanUA('${esc(r.ua)}')">封禁UA</button></td>
       </tr>`).join('')}
     </tbody></table>` : '<div class="empty">今日暂无可疑UA</div>';
 
@@ -954,6 +989,7 @@ function renderStats() {
         <button class="copy-btn" data-val="${esc(r.token)}" onclick="copyText(this.dataset.val)">复制</button>
       </span>
       <span class="top-count" style="white-space:nowrap">${r.ip_count} 个不同IP</span>
+      <button class="add-btn-sm" style="margin-left:8px" onclick="quickBanToken('${esc(r.token)}')">拉黑</button>
     </div>`).join('') : '<div class="empty">暂无可疑Token（阈值：3个以上不同IP）</div>';
 
   // 可疑 IP
@@ -1419,6 +1455,78 @@ async function importBlacklist(input) {
   }
 }
 
+// ── Token黑名单 ────────────────────────────────────────────────
+async function loadTokenBlacklist() {
+  const data = await apiFetch('/api/token_blacklist.php');
+  if (!data.ok) {
+    document.getElementById('tb-list').innerHTML = '<div class="empty">加载失败：' + esc(data.error||'未知错误') + '</div>';
+    toast('加载失败: ' + (data.error||''), 'err'); return;
+  }
+  const entries = data.entries || [];
+  if (!entries.length) {
+    document.getElementById('tb-list').innerHTML = '<div class="empty">Token黑名单为空</div>';
+    return;
+  }
+  document.getElementById('tb-list').innerHTML = `
+    <table><thead><tr><th>Token</th><th>今日拉取</th><th>备注</th><th>添加时间</th><th>操作</th></tr></thead>
+    <tbody>${entries.map(e => {
+      const pullsHtml = e.today_pulls && e.today_pulls.length
+        ? e.today_pulls.map(p => `<span style="font-size:11px;color:#94a3b8">${esc(p.ip)}<span style="color:#ef4444;margin-left:3px">${p.count}次</span></span>`).join('&ensp;')
+        : '<span style="color:#475569;font-size:11px">今日无拉取</span>';
+      const tok = e.token || '';
+      const tokDisplay = tok.length > 16 ? tok.substr(0,8)+'…'+tok.slice(-4) : tok;
+      return `<tr>
+        <td style="font-family:monospace;font-size:12px" title="${esc(tok)}">${esc(tokDisplay)}<button class="copy-btn" data-val="${esc(tok)}" onclick="copyText(this.dataset.val)" style="margin-left:4px">复制</button></td>
+        <td>${pullsHtml}</td>
+        <td style="color:#94a3b8;font-size:12px">${esc(e.comment||'')}</td>
+        <td style="color:#64748b;font-size:11px;white-space:nowrap">${esc(e.added_at||'')}</td>
+        <td><button class="btn-danger" style="font-size:12px;padding:2px 8px" onclick="tbDel('${esc(tok)}')">移除</button></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+async function tbAdd() {
+  const tok = document.getElementById('tb-token').value.trim();
+  const cmt = document.getElementById('tb-comment').value.trim();
+  if (!tok) { toast('请输入 Token', 'err'); return; }
+  const d = await apiFetch('/api/token_blacklist.php', {
+    method:'POST', body:JSON.stringify({token:tok, comment:cmt}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    document.getElementById('tb-token').value = '';
+    document.getElementById('tb-comment').value = '';
+    toast('✅ Token 已加入黑名单');
+    loadTokenBlacklist();
+  } else toast(d.error||'添加失败','err');
+}
+
+async function quickBanToken(token) {
+  if (!confirm(`将该 Token 加入黑名单？\n${token.substr(0,20)}…`)) return;
+  const d = await apiFetch('/api/token_blacklist.php', {
+    method:'POST', body:JSON.stringify({token, comment:'从分析页拉黑'}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok || (d.error && d.error.includes('已在黑名单'))) {
+    toast('✅ Token 已加入黑名单');
+    if (allStatsData) {
+      allStatsData.susp_tokens = (allStatsData.susp_tokens||[]).filter(r => r.token !== token);
+      renderStats();
+    }
+  } else toast(d.error||'操作失败','err');
+}
+
+async function tbDel(token) {
+  if (!confirm(`确定移除该 Token？`)) return;
+  const d = await apiFetch('/api/token_blacklist.php', {
+    method:'DELETE', body:JSON.stringify({token}),
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+  });
+  if (d.ok) { toast('✅ 已移除'); loadTokenBlacklist(); }
+  else toast(d.error||'移除失败','err');
+}
+
 // ── 系统设置 ───────────────────────────────────────────────────
 let currentSettings = {};
 
@@ -1553,6 +1661,7 @@ async function importLogs(input) {
     if (d.ok) {
       toast(`✅ 导入成功：新增 ${d.imported} 行，共 ${d.total} 行`);
       loadLogs();
+      if (allStatsData) loadStats();
     } else {
       toast(d.error || '导入失败', 'err');
     }
