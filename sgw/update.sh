@@ -71,6 +71,24 @@ if [[ -f .env.bak ]]; then
     echo -e "${CYAN}已还原 .env${RESET}"
 fi
 
+# 从 gw_config volume 同步管理员在面板中保存的 gateway_port 到 .env
+GW_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep '_gw_config$' | head -1)
+if [[ -n "$GW_VOL" ]]; then
+    GW_VOL_PATH=$(docker volume inspect "$GW_VOL" --format '{{.Mountpoint}}' 2>/dev/null || true)
+    SETTINGS_FILE="${GW_VOL_PATH}/admin_settings.json"
+    if [[ -n "$GW_VOL_PATH" && -f "$SETTINGS_FILE" ]]; then
+        SAVED_GW_PORT=$(grep '"gateway_port"' "$SETTINGS_FILE" 2>/dev/null \
+            | sed 's/[^0-9]*\([0-9]*\).*/\1/' | head -1 || true)
+        if [[ -n "$SAVED_GW_PORT" && "$SAVED_GW_PORT" =~ ^[0-9]+$ ]]; then
+            CURRENT_GW_PORT=$(grep '^GATEWAY_PORT=' .env 2>/dev/null | cut -d= -f2 || true)
+            if [[ "$SAVED_GW_PORT" != "$CURRENT_GW_PORT" ]]; then
+                sed -i "s/^GATEWAY_PORT=.*/GATEWAY_PORT=${SAVED_GW_PORT}/" .env
+                echo -e "${CYAN}已同步网关端口：${CURRENT_GW_PORT:-旧值} → ${SAVED_GW_PORT}${RESET}"
+            fi
+        fi
+    fi
+fi
+
 # 重新构建并重启容器
 echo ""
 echo -e "${CYAN}正在重新构建容器…${RESET}"

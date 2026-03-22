@@ -529,6 +529,21 @@ tr:hover td{background:rgba(99,102,241,.04)}
           </div>
         </div>
 
+        <!-- 网关端口配置 -->
+        <div class="card">
+          <div class="card-title">订阅网关</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="display:block;color:var(--text2);font-size:12px;margin-bottom:5px">网关监听端口（客户端订阅用的端口）</label>
+              <input class="ip-input" id="cfg-gateway-port" type="number" min="1" max="65535"
+                value="<?= _val((string)($_preSg['gateway_port'] ?? GATEWAY_PORT)) ?>"
+                style="width:100%;box-sizing:border-box">
+            </div>
+            <div class="apply-hint" style="color:#eab308">⚠️ 修改后需在宿主机执行 <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">bash update.sh</code> 重启容器方可生效</div>
+            <button class="btn-primary" onclick="saveGatewayPort()">保存网关端口</button>
+          </div>
+        </div>
+
         <!-- SSL 证书信息 -->
         <div class="card">
           <div class="card-title">SSL 证书</div>
@@ -1712,6 +1727,10 @@ async function loadSettings() {
   document.getElementById('cfg-upstream-url').value    = _displayUrl;
   document.getElementById('cfg-upstream-port').value   = _displayPort;
   document.getElementById('cfg-subscribe-path').value  = currentSettings.subscribe_path || '';
+  // 填充网关端口
+  if (currentSettings.gateway_port) {
+    document.getElementById('cfg-gateway-port').value = currentSettings.gateway_port;
+  }
   // 显示证书信息
   const cert = data.cert || {};
   const certEl = document.getElementById('cert-info');
@@ -1762,6 +1781,22 @@ async function saveCredSettings() {
     document.getElementById('cfg-new-pass').value = '';
     document.getElementById('cfg-confirm-pass').value = '';
     if (newPass) setTimeout(() => location.reload(), 2000);
+  } else {
+    toast(d.error || '保存失败', 'err');
+  }
+}
+
+async function saveGatewayPort() {
+  const portStr = document.getElementById('cfg-gateway-port').value.trim();
+  const port = parseInt(portStr, 10);
+  if (isNaN(port) || port < 1 || port > 65535) { toast('端口号无效（1-65535）', 'err'); return; }
+  const d = await apiFetch('/api/settings.php', {
+    method: 'POST', body: JSON.stringify({gateway_port: port}),
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+  });
+  if (d.ok) {
+    toast('✅ ' + (d.msg || '网关端口已保存'));
+    loadSettings();
   } else {
     toast(d.error || '保存失败', 'err');
   }

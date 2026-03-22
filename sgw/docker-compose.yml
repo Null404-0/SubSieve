@@ -27,6 +27,7 @@ services:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASS=${ADMIN_PASS}
       - ADMIN_SECRET_PATH=${ADMIN_SECRET_PATH}
+      - GATEWAY_PORT=${GATEWAY_PORT:-443}
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
       - gw_config:/etc/nginx/subscribe
